@@ -25,6 +25,42 @@ export const demoUsers: AppUser[] = [
     canLogin: true,
     canOwnActions: true,
     roles: ["ACTION_OWNER"]
+  },
+  {
+    id: "u-003",
+    employeeCode: "EMP-003",
+    fullName: "Recipient User",
+    email: "recipient@bank.local",
+    branchId: "b-002",
+    departmentId: "d-002",
+    isActive: true,
+    canLogin: true,
+    canOwnActions: false,
+    roles: ["RECIPIENT"]
+  },
+  {
+    id: "u-004",
+    employeeCode: "EMP-004",
+    fullName: "System Administrator",
+    email: "admin@bank.local",
+    branchId: "b-001",
+    departmentId: "d-001",
+    isActive: true,
+    canLogin: true,
+    canOwnActions: true,
+    roles: ["ADMIN", "DASHBOARD_VIEWER"]
+  },
+  {
+    id: "u-005",
+    employeeCode: "EMP-005",
+    fullName: "Executive Viewer",
+    email: "executive@bank.local",
+    branchId: "b-001",
+    departmentId: "d-002",
+    isActive: true,
+    canLogin: true,
+    canOwnActions: false,
+    roles: ["DASHBOARD_VIEWER", "COPIED_VIEWER"]
   }
 ];
 

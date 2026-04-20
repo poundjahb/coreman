@@ -5,6 +5,7 @@
 body {
   margin: 0;
   min-height: 100vh;
+  color: #1b2431;
   background:
     radial-gradient(circle at 20% 0%, rgba(35, 104, 196, 0.08), transparent 28%),
     radial-gradient(circle at 90% 100%, rgba(194, 125, 22, 0.08), transparent 24%),
@@ -13,4 +14,68 @@ body {
 
 #root {
   min-height: 100vh;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+.workspace-main-reveal {
+  animation: workspaceMainReveal 220ms ease-out;
+}
+
+.menu-section-reveal {
+  animation: menuSectionReveal 260ms ease both;
+}
+
+.menu-link-motion {
+  transition: transform 160ms ease, background-color 160ms ease, box-shadow 180ms ease;
+}
+
+.menu-link-motion:hover {
+  transform: translateX(2px);
+}
+
+.navbar-content-scroll {
+  flex: 1;
+  min-height: 0;
+}
+
+.sidebar-menu-panel {
+  padding: 8px;
+  border: 1px solid rgba(22, 43, 71, 0.12);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 8px 24px rgba(30, 52, 84, 0.08);
+}
+
+.sidebar-menu-title {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #7b8797;
+  text-transform: uppercase;
+  margin-bottom: 2px;
+}
+
+@keyframes workspaceMainReveal {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes menuSectionReveal {
+  from {
+    opacity: 0;
+    transform: translateX(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }
