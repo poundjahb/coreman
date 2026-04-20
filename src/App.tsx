@@ -1,34 +1,44 @@
-import { Box, Tabs, Text } from "@mantine/core";
+import { useState } from "react";
+import { AppShell, Group, NavLink, Text } from "@mantine/core";
 import { DashboardScreen } from "./screens/DashboardScreen";
 import { ReceptionistScreen } from "./screens/ReceptionistScreen";
 
+type Screen = "dashboard" | "receptionist";
+
 export function App(): JSX.Element {
+  const [activeScreen, setActiveScreen] = useState<Screen>("dashboard");
+
   return (
-    <Box
-      style={{
-        width: "min(1200px, 94vw)",
-        margin: "2rem auto",
-        paddingBottom: "2rem"
-      }}
+    <AppShell
+      header={{ height: 56 }}
+      padding={0}
     >
-      <Tabs defaultValue="dashboard" variant="outline" radius="md">
-        <Tabs.List mb="md">
-          <Tabs.Tab value="dashboard">
-            <Text fw={600}>Dashboard</Text>
-          </Tabs.Tab>
-          <Tabs.Tab value="receptionist">
-            <Text fw={600}>Receptionist Intake</Text>
-          </Tabs.Tab>
-        </Tabs.List>
+      <AppShell.Header>
+        <Group h="100%" px="md" justify="space-between">
+          <Text fw={700} size="sm" c="blue.8" style={{ letterSpacing: "0.04em" }}>
+            Correspondence Management
+          </Text>
+          <Group gap="xs">
+            <NavLink
+              label="Dashboard"
+              active={activeScreen === "dashboard"}
+              onClick={() => setActiveScreen("dashboard")}
+              style={{ borderRadius: 8 }}
+            />
+            <NavLink
+              label="Receptionist"
+              active={activeScreen === "receptionist"}
+              onClick={() => setActiveScreen("receptionist")}
+              style={{ borderRadius: 8 }}
+            />
+          </Group>
+        </Group>
+      </AppShell.Header>
 
-        <Tabs.Panel value="dashboard">
-          <DashboardScreen />
-        </Tabs.Panel>
-
-        <Tabs.Panel value="receptionist">
-          <ReceptionistScreen />
-        </Tabs.Panel>
-      </Tabs>
-    </Box>
+      <AppShell.Main>
+        {activeScreen === "dashboard" && <DashboardScreen />}
+        {activeScreen === "receptionist" && <ReceptionistScreen />}
+      </AppShell.Main>
+    </AppShell>
   );
 }

@@ -6,8 +6,8 @@ import { App } from "./App";
 import "./styles.css";
 
 const theme = createTheme({
-  primaryColor: "blue",
-  fontFamily: '"Aptos", "Segoe UI", sans-serif'
+  fontFamily: '"Aptos", "Segoe UI", sans-serif',
+  primaryColor: "blue"
 });
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
