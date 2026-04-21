@@ -14,10 +14,10 @@ import {
   TextInput,
   Title
 } from "@mantine/core";
-import { demoReferenceConfigs, demoUsers } from "../modules/admin/seedData";
-import { registerCorrespondence } from "../modules/intake/registerCorrespondence";
-import type { IntakeResult } from "../modules/intake/registerCorrespondence";
-import { systemConfig } from "../config/systemConfig";
+import { demoReferenceConfigs, demoUsers } from "../../application/modules/admin/seedData";
+import { registerCorrespondence } from "../../application/modules/intake/registerCorrespondence";
+import type { IntakeResult } from "../../application/modules/intake/registerCorrespondence";
+import { systemConfig } from "../../config/systemConfig";
 import { DataRow } from "../components/DataRow";
 
 const BRANCHES = [

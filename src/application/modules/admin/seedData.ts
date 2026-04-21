@@ -1,5 +1,5 @@
-import type { AppUser } from "../../domain/governance";
-import type { ReferenceFormatConfig } from "../../domain/reference";
+import type { AppUser } from "../../../domain/governance";
+import type { ReferenceFormatConfig } from "../../../domain/reference";
 
 export const demoUsers: AppUser[] = [
   {

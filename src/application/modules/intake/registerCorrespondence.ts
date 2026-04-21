@@ -1,5 +1,5 @@
-import type { AppUser } from "../../domain/governance";
-import type { ReferenceFormatConfig } from "../../domain/reference";
+import type { AppUser } from "../../../domain/governance";
+import type { ReferenceFormatConfig } from "../../../domain/reference";
 import { assertRole } from "../../services/accessControl";
 import { generateReference, InMemorySequenceStore } from "../../services/referenceEngine";
 

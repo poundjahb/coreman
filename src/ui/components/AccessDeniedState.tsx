@@ -1,6 +1,6 @@
 import { Alert, Button, Group, Stack, Text, Title } from "@mantine/core";
 import { Link } from "react-router-dom";
-import type { RoleCode } from "../domain/governance";
+import type { RoleCode } from "../../domain/governance";
 
 interface AccessDeniedStateProps {
   requiredRoles: RoleCode[];

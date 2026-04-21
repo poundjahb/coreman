@@ -38,16 +38,16 @@ import {
 } from "lucide-react";
 import { Navigate, NavLink as RouterNavLink, Route, Routes, useLocation } from "react-router-dom";
 import type { AppUser, RoleCode } from "./domain/governance";
-import { hasRole } from "./services/accessControl";
-import { demoUsers } from "./modules/admin/seedData";
-import { AccessDeniedState } from "./components/AccessDeniedState";
-import { ReceptionistDashboardPage } from "./screens/ReceptionistDashboardPage";
-import { ReceptionistHistoryPage } from "./screens/ReceptionistHistoryPage";
-import { WorkDashboardPage } from "./screens/WorkDashboardPage";
-import { TaskAssignationPage } from "./screens/TaskAssignationPage";
-import { TakeActionPage } from "./screens/TakeActionPage";
-import { GeneralDashboardPage } from "./screens/GeneralDashboardPage";
-import { CorrespondenceSearchPage } from "./screens/CorrespondenceSearchPage";
+import { hasRole } from "./application/services/accessControl";
+import { demoUsers } from "./application/modules/admin/seedData";
+import { AccessDeniedState } from "./ui/components/AccessDeniedState";
+import { ReceptionistDashboardPage } from "./ui/screens/ReceptionistDashboardPage";
+import { ReceptionistHistoryPage } from "./ui/screens/ReceptionistHistoryPage";
+import { WorkDashboardPage } from "./ui/screens/WorkDashboardPage";
+import { TaskAssignationPage } from "./ui/screens/TaskAssignationPage";
+import { TakeActionPage } from "./ui/screens/TakeActionPage";
+import { GeneralDashboardPage } from "./ui/screens/GeneralDashboardPage";
+import { CorrespondenceSearchPage } from "./ui/screens/CorrespondenceSearchPage";
 import {
   AdminActionsCatalogPage,
   AdminAuditLogsPage,
@@ -57,7 +57,7 @@ import {
   AdminPerformancePage,
   AdminSystemControlPage,
   AdminUsersPage
-} from "./screens/admin/AdminPages";
+} from "./ui/screens/admin/AdminPages";
 
 interface NavItem {
   label: string;

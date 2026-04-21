@@ -1,7 +1,7 @@
 import type { Branch, Department } from "../../../domain/governance";
 import type { Correspondence } from "../../../domain/correspondence";
-import { InMemorySequenceStore } from "../../../services/referenceEngine";
-import { demoUsers, demoReferenceConfigs } from "../../../modules/admin/seedData";
+import { InMemorySequenceStore } from "../../../application/services/referenceEngine";
+import { demoUsers, demoReferenceConfigs } from "../../../application/modules/admin/seedData";
 import type { IHostAdapter } from "../../IHostAdapter";
 import { InMemoryBranchRepository } from "./InMemoryBranchRepository";
 import { InMemoryCorrespondenceRepository } from "./InMemoryCorrespondenceRepository";
