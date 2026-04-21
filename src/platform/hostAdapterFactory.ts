@@ -19,6 +19,12 @@ export function createHostAdapter(target: PlatformTarget): IHostAdapter {
     case "DATAVERSE":
       return dataverseHostAdapter;
     case "SQLITE":
+      if (typeof window !== "undefined" && typeof window.electronAPI === "undefined") {
+        console.warn(
+          "SQLite target selected but Electron API bridge is unavailable. Falling back to in-memory adapter."
+        );
+        return createInMemoryHostAdapter();
+      }
       return createIpcHostAdapter();
     case "IN_MEMORY":
       return createInMemoryHostAdapter();

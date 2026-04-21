@@ -7,6 +7,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "test": "npx --yes tsx --test tests/*.test.ts",
     "preview": "vite preview",
     "electron:dev": "electron-vite dev",
     "electron:build": "electron-vite build",

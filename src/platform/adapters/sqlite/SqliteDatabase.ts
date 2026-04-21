@@ -1,11 +1,19 @@
 import BetterSqlite3 from "better-sqlite3";
 import type { Database } from "better-sqlite3";
+import {
+  demoBranches,
+  demoCorrespondences,
+  demoDepartments,
+  demoReferenceConfigs,
+  demoUsers
+} from "../../../application/modules/admin/seedData";
 
 export function openDatabase(dbPath: string): Database {
   const db = new BetterSqlite3(dbPath);
   db.pragma("journal_mode = WAL");
   db.pragma("foreign_keys = ON");
   initSchema(db);
+  seedDatabase(db);
   return db;
 }
 
@@ -79,4 +87,86 @@ function initSchema(db: Database): void {
       sentAt           TEXT NOT NULL
     );
   `);
+}
+
+function hasRows(db: Database, tableName: string): boolean {
+  const row = db.prepare(`SELECT COUNT(1) as count FROM ${tableName}`).get() as { count: number };
+  return row.count > 0;
+}
+
+function seedDatabase(db: Database): void {
+  if (!hasRows(db, "branches")) {
+    const insertBranch = db.prepare(
+      `INSERT INTO branches (id, code, name, isActive)
+       VALUES (@id, @code, @name, @isActive)`
+    );
+    for (const branch of demoBranches) {
+      insertBranch.run({ ...branch, isActive: branch.isActive ? 1 : 0 });
+    }
+  }
+
+  if (!hasRows(db, "departments")) {
+    const insertDepartment = db.prepare(
+      `INSERT INTO departments (id, code, name, isActive)
+       VALUES (@id, @code, @name, @isActive)`
+    );
+    for (const department of demoDepartments) {
+      insertDepartment.run({ ...department, isActive: department.isActive ? 1 : 0 });
+    }
+  }
+
+  if (!hasRows(db, "users")) {
+    const insertUser = db.prepare(
+      `INSERT INTO users
+        (id, employeeCode, fullName, email, branchId, departmentId, isActive, canLogin, canOwnActions, roles)
+       VALUES
+        (@id, @employeeCode, @fullName, @email, @branchId, @departmentId, @isActive, @canLogin, @canOwnActions, @roles)`
+    );
+    for (const user of demoUsers) {
+      insertUser.run({
+        ...user,
+        isActive: user.isActive ? 1 : 0,
+        canLogin: user.canLogin ? 1 : 0,
+        canOwnActions: user.canOwnActions ? 1 : 0,
+        roles: JSON.stringify(user.roles)
+      });
+    }
+  }
+
+  if (!hasRows(db, "reference_configs")) {
+    const insertConfig = db.prepare(
+      `INSERT INTO reference_configs
+        (id, scope, branchId, departmentId, pattern, resetPolicy, isActive)
+       VALUES
+        (@id, @scope, @branchId, @departmentId, @pattern, @resetPolicy, @isActive)`
+    );
+    for (const config of demoReferenceConfigs) {
+      insertConfig.run({
+        ...config,
+        branchId: config.branchId ?? null,
+        departmentId: config.departmentId ?? null,
+        isActive: config.isActive ? 1 : 0
+      });
+    }
+  }
+
+  if (!hasRows(db, "correspondences")) {
+    const insertCorrespondence = db.prepare(
+      `INSERT INTO correspondences
+        (id, reference, subject, direction, branchId, departmentId, registeredById,
+         recipientId, actionOwnerId, status, receivedDate, dueDate, createdAt, updatedAt)
+       VALUES
+        (@id, @reference, @subject, @direction, @branchId, @departmentId, @registeredById,
+         @recipientId, @actionOwnerId, @status, @receivedDate, @dueDate, @createdAt, @updatedAt)`
+    );
+    for (const correspondence of demoCorrespondences) {
+      insertCorrespondence.run({
+        ...correspondence,
+        departmentId: correspondence.departmentId ?? null,
+        recipientId: correspondence.recipientId ?? null,
+        actionOwnerId: correspondence.actionOwnerId ?? null,
+        dueDate: correspondence.dueDate ?? null
+      });
+    }
+  }
 }

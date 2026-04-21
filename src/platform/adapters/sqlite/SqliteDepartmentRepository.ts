@@ -19,4 +19,18 @@ export class SqliteDepartmentRepository implements IDepartmentRepository {
       rowToDepartment
     );
   }
+
+  async save(department: Department): Promise<void> {
+    this.db.prepare(
+      `INSERT OR REPLACE INTO departments (id, code, name, isActive)
+       VALUES (@id, @code, @name, @isActive)`
+    ).run({
+      ...department,
+      isActive: department.isActive ? 1 : 0
+    });
+  }
+
+  async delete(id: string): Promise<void> {
+    this.db.prepare("DELETE FROM departments WHERE id = ?").run(id);
+  }
 }

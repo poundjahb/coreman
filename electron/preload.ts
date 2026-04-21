@@ -15,15 +15,21 @@ contextBridge.exposeInMainWorld("electronAPI", {
   users: {
     findById: (id: string) => ipcRenderer.invoke("users:findById", id),
     findAll: () => ipcRenderer.invoke("users:findAll"),
-    findByBranch: (branchId: string) => ipcRenderer.invoke("users:findByBranch", branchId)
+    findByBranch: (branchId: string) => ipcRenderer.invoke("users:findByBranch", branchId),
+    save: (user: import("../src/domain/governance").AppUser) => ipcRenderer.invoke("users:save", user),
+    delete: (id: string) => ipcRenderer.invoke("users:delete", id)
   },
   branches: {
     findById: (id: string) => ipcRenderer.invoke("branches:findById", id),
-    findAll: () => ipcRenderer.invoke("branches:findAll")
+    findAll: () => ipcRenderer.invoke("branches:findAll"),
+    save: (branch: import("../src/domain/governance").Branch) => ipcRenderer.invoke("branches:save", branch),
+    delete: (id: string) => ipcRenderer.invoke("branches:delete", id)
   },
   departments: {
     findById: (id: string) => ipcRenderer.invoke("departments:findById", id),
-    findAll: () => ipcRenderer.invoke("departments:findAll")
+    findAll: () => ipcRenderer.invoke("departments:findAll"),
+    save: (department: import("../src/domain/governance").Department) => ipcRenderer.invoke("departments:save", department),
+    delete: (id: string) => ipcRenderer.invoke("departments:delete", id)
   },
   referenceConfigs: {
     findAll: () => ipcRenderer.invoke("referenceConfigs:findAll"),

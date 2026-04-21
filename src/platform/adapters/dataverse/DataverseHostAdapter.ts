@@ -30,17 +30,23 @@ const dataverseCorrespondenceRepository: ICorrespondenceRepository = {
 const dataverseUserRepository: IUserRepository = {
   findById: (_id) => notImplemented("users.findById"),
   findAll: () => notImplemented("users.findAll"),
-  findByBranch: (_branchId) => notImplemented("users.findByBranch")
+  findByBranch: (_branchId) => notImplemented("users.findByBranch"),
+  save: (_user) => notImplemented("users.save"),
+  delete: (_id) => notImplemented("users.delete")
 };
 
 const dataverseBranchRepository: IBranchRepository = {
   findById: (_id) => notImplemented("branches.findById"),
-  findAll: () => notImplemented("branches.findAll")
+  findAll: () => notImplemented("branches.findAll"),
+  save: (_branch) => notImplemented("branches.save"),
+  delete: (_id) => notImplemented("branches.delete")
 };
 
 const dataverseDepartmentRepository: IDepartmentRepository = {
   findById: (_id) => notImplemented("departments.findById"),
-  findAll: () => notImplemented("departments.findAll")
+  findAll: () => notImplemented("departments.findAll"),
+  save: (_department) => notImplemented("departments.save"),
+  delete: (_id) => notImplemented("departments.delete")
 };
 
 const dataverseReferenceConfigRepository: IReferenceConfigRepository = {

@@ -3,6 +3,7 @@ import path from "path";
 import { createSqliteHostAdapter } from "../src/platform/adapters/sqlite/SqliteHostAdapter";
 import type { IHostAdapter } from "../src/platform/IHostAdapter";
 import type { Correspondence } from "../src/domain/correspondence";
+import type { AppUser, Branch, Department } from "../src/domain/governance";
 import type { NotificationPayload } from "../src/platform/contracts/INotificationService";
 
 let adapter: IHostAdapter;
@@ -49,14 +50,22 @@ function registerIpcHandlers(): void {
   ipcMain.handle("users:findByBranch", (_e, branchId: string) =>
     adapter.users.findByBranch(branchId)
   );
+  ipcMain.handle("users:save", (_e, user: AppUser) => adapter.users.save(user));
+  ipcMain.handle("users:delete", (_e, id: string) => adapter.users.delete(id));
 
   // branches
   ipcMain.handle("branches:findById", (_e, id: string) => adapter.branches.findById(id));
   ipcMain.handle("branches:findAll", () => adapter.branches.findAll());
+  ipcMain.handle("branches:save", (_e, branch: Branch) => adapter.branches.save(branch));
+  ipcMain.handle("branches:delete", (_e, id: string) => adapter.branches.delete(id));
 
   // departments
   ipcMain.handle("departments:findById", (_e, id: string) => adapter.departments.findById(id));
   ipcMain.handle("departments:findAll", () => adapter.departments.findAll());
+  ipcMain.handle("departments:save", (_e, department: Department) =>
+    adapter.departments.save(department)
+  );
+  ipcMain.handle("departments:delete", (_e, id: string) => adapter.departments.delete(id));
 
   // referenceConfigs
   ipcMain.handle("referenceConfigs:findAll", () => adapter.referenceConfigs.findAll());

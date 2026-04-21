@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   AppShell,
   Avatar,
@@ -39,12 +39,13 @@ import {
 import { Navigate, NavLink as RouterNavLink, Route, Routes, useLocation } from "react-router-dom";
 import type { AppUser, RoleCode } from "./domain/governance";
 import { hasRole } from "./application/services/accessControl";
-import { demoUsers } from "./application/modules/admin/seedData";
 import { getPlatformIndicator } from "./platform/hostAdapterFactory";
 import { getRuntimePlatformTarget } from "./platform/runtimePlatformTarget";
+import { runtimeHostAdapter } from "./platform/runtimeHostAdapter";
 import { AccessDeniedState } from "./ui/components/AccessDeniedState";
 import { ReceptionistDashboardPage } from "./ui/screens/ReceptionistDashboardPage";
 import { ReceptionistHistoryPage } from "./ui/screens/ReceptionistHistoryPage";
+import { ReceptionistScreen } from "./ui/screens/ReceptionistScreen";
 import { WorkDashboardPage } from "./ui/screens/WorkDashboardPage";
 import { TaskAssignationPage } from "./ui/screens/TaskAssignationPage";
 import { TakeActionPage } from "./ui/screens/TakeActionPage";
@@ -53,6 +54,7 @@ import { CorrespondenceSearchPage } from "./ui/screens/CorrespondenceSearchPage"
 import {
   AdminActionsCatalogPage,
   AdminAuditLogsPage,
+  AdminBranchesPage,
   AdminDepartmentsPage,
   AdminFlowAgentsPage,
   AdminHealthPage,
@@ -145,6 +147,12 @@ const navSections: NavSection[] = [
     items: [
       { label: "Admin - Users", to: "/admin/users", roles: ["ADMIN"], icon: <Users size={16} /> },
       {
+        label: "Admin - Branches",
+        to: "/admin/branches",
+        roles: ["ADMIN"],
+        icon: <Building2 size={16} />
+      },
+      {
         label: "Admin - Departments",
         to: "/admin/departments",
         roles: ["ADMIN"],
@@ -196,8 +204,10 @@ const navSections: NavSection[] = [
 
 export function App(): JSX.Element {
   const [navbarCollapsed, setNavbarCollapsed] = useState(false);
-  const [currentUserId, setCurrentUserId] = useState<string>(demoUsers[0].id);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [menuOpened, setMenuOpened] = useState(true);
+  const [availableUsers, setAvailableUsers] = useState<AppUser[]>([]);
+  const [usersError, setUsersError] = useState<string | null>(null);
   const location = useLocation();
   const runtimePlatformTarget = useMemo(() => getRuntimePlatformTarget(), []);
   const platformIndicator = useMemo(
@@ -205,10 +215,69 @@ export function App(): JSX.Element {
     [runtimePlatformTarget]
   );
 
+  useEffect(() => {
+    let active = true;
+
+    async function loadUsers(): Promise<void> {
+      try {
+        setUsersError(null);
+        const users = await runtimeHostAdapter.users.findAll();
+
+        if (!active) {
+          return;
+        }
+
+        setAvailableUsers(users);
+        setCurrentUserId((current) => {
+          if (current && users.some((user) => user.id === current)) {
+            return current;
+          }
+
+          return users[0]?.id ?? null;
+        });
+      } catch (loadError) {
+        if (!active) {
+          return;
+        }
+
+        setUsersError(loadError instanceof Error ? loadError.message : "Unable to load users.");
+      }
+    }
+
+    void loadUsers();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
   const currentUser = useMemo(
-    () => demoUsers.find((user) => user.id === currentUserId) ?? demoUsers[0],
-    [currentUserId]
+    () => availableUsers.find((user) => user.id === currentUserId) ?? availableUsers[0] ?? null,
+    [availableUsers, currentUserId]
   );
+
+  async function refreshUsers(): Promise<void> {
+    const users = await runtimeHostAdapter.users.findAll();
+    setAvailableUsers(users);
+    setCurrentUserId((current) => {
+      if (current && users.some((user) => user.id === current)) {
+        return current;
+      }
+
+      return users[0]?.id ?? null;
+    });
+  }
+
+  if (!currentUser) {
+    return (
+      <Box p="lg">
+        <Title order={3}>No active user available</Title>
+        <Text c="dimmed" mt="xs">
+          {usersError ?? "Seed or create at least one user record to continue."}
+        </Text>
+      </Box>
+    );
+  }
 
   return (
     <AppShell
@@ -343,8 +412,8 @@ export function App(): JSX.Element {
             {!navbarCollapsed && (
               <Select
                 value={currentUserId}
-                onChange={(value) => setCurrentUserId(value ?? demoUsers[0].id)}
-                data={demoUsers.map((user) => ({
+                onChange={(value) => setCurrentUserId(value)}
+                data={availableUsers.map((user) => ({
                   value: user.id,
                   label: `${user.fullName} (${user.roles.join(", ")})`
                 }))}
@@ -366,7 +435,15 @@ export function App(): JSX.Element {
             path="/receptionist/dashboard"
             element={
               <ProtectedRoute currentUser={currentUser} requiredRoles={["RECEPTIONIST", "ADMIN"]}>
-                <ReceptionistDashboardPage />
+                <ReceptionistDashboardPage currentUser={currentUser} />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/receptionist/new"
+            element={
+              <ProtectedRoute currentUser={currentUser} requiredRoles={["RECEPTIONIST", "ADMIN"]}>
+                <ReceptionistScreen currentUser={currentUser} />
               </ProtectedRoute>
             }
           />
@@ -408,7 +485,15 @@ export function App(): JSX.Element {
             path="/admin/users"
             element={
               <ProtectedRoute currentUser={currentUser} requiredRoles={["ADMIN"]}>
-                <AdminUsersPage />
+                <AdminUsersPage onUsersChanged={refreshUsers} />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/branches"
+            element={
+              <ProtectedRoute currentUser={currentUser} requiredRoles={["ADMIN"]}>
+                <AdminBranchesPage />
               </ProtectedRoute>
             }
           />

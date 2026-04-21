@@ -1,0 +1,73 @@
+import { openDatabase } from "./SqliteDatabase";
+import { SqliteCorrespondenceRepository } from "./SqliteCorrespondenceRepository";
+import { SqliteUserRepository } from "./SqliteUserRepository";
+import { SqliteBranchRepository } from "./SqliteBranchRepository";
+import { SqliteDepartmentRepository } from "./SqliteDepartmentRepository";
+import { SqliteReferenceConfigRepository } from "./SqliteReferenceConfigRepository";
+import { SqliteNotificationService } from "./SqliteNotificationService";
+import { SqliteSequenceStore } from "./SqliteSequenceStore";
+import { buildPlatformIndicator } from "../../platformIndicator";
+export const sqliteMainProcessPlatformIndicator = buildPlatformIndicator({
+    target: "SQLITE",
+    label: "SQLite (Main)",
+    initials: "SQ",
+    backgroundColor: "#5742d6"
+});
+/**
+ * Creates a fully wired SQLite host adapter.
+ * Call this from the Electron main process, passing the path to the .db file.
+ */
+export function createSqliteHostAdapter(dbPath) {
+    const db = openDatabase(dbPath);
+    return {
+        platform: sqliteMainProcessPlatformIndicator,
+        correspondences: new SqliteCorrespondenceRepository(db),
+        users: new SqliteUserRepository(db),
+        branches: new SqliteBranchRepository(db),
+        departments: new SqliteDepartmentRepository(db),
+        referenceConfigs: new SqliteReferenceConfigRepository(db),
+        notifications: new SqliteNotificationService(db),
+        sequenceStore: new SqliteSequenceStore(db)
+    };
+}
+/**
+ * Placeholder exported for hostAdapterFactory compatibility.
+ * Replace with createSqliteHostAdapter(dbPath) once Electron main process is wired.
+ */
+export const sqliteHostAdapter = (() => {
+    function notReady(method) {
+        throw new Error(`SqliteHostAdapter: call createSqliteHostAdapter(dbPath) — ${method} unavailable`);
+    }
+    return {
+        platform: sqliteMainProcessPlatformIndicator,
+        correspondences: {
+            findById: () => notReady("findById"),
+            findAll: () => notReady("findAll"),
+            findByBranch: () => notReady("findByBranch"),
+            save: () => notReady("save"),
+            update: () => notReady("update")
+        },
+        users: {
+            findById: () => notReady("findById"),
+            findAll: () => notReady("findAll"),
+            findByBranch: () => notReady("findByBranch"),
+            save: () => notReady("save"),
+            delete: () => notReady("delete")
+        },
+        branches: {
+            findById: () => notReady("findById"),
+            findAll: () => notReady("findAll"),
+            save: () => notReady("save"),
+            delete: () => notReady("delete")
+        },
+        departments: {
+            findById: () => notReady("findById"),
+            findAll: () => notReady("findAll"),
+            save: () => notReady("save"),
+            delete: () => notReady("delete")
+        },
+        referenceConfigs: { findAll: () => notReady("findAll"), findActive: () => notReady("findActive") },
+        notifications: { send: () => notReady("send") },
+        sequenceStore: { next: () => notReady("next") }
+    };
+})();

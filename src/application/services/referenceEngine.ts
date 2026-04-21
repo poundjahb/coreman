@@ -10,7 +10,7 @@ function padSequence(rawValue: number, token: string): string {
   return String(rawValue).padStart(size, "0");
 }
 
-function getPeriodKey(date: Date, policy: ReferenceFormatConfig["resetPolicy"]): string {
+export function getPeriodKey(date: Date, policy: ReferenceFormatConfig["resetPolicy"]): string {
   const year = date.getUTCFullYear();
   const month = String(date.getUTCMonth() + 1).padStart(2, "0");
 
@@ -25,7 +25,7 @@ function getPeriodKey(date: Date, policy: ReferenceFormatConfig["resetPolicy"]):
   return "NO_RESET";
 }
 
-function resolveConfig(
+export function resolveConfig(
   configs: ReferenceFormatConfig[],
   context: ReferenceContext
 ): ReferenceFormatConfig {
@@ -56,7 +56,7 @@ function resolveConfig(
   return global;
 }
 
-function renderPattern(
+export function renderPattern(
   pattern: string,
   context: ReferenceContext,
   sequence: number
@@ -90,6 +90,24 @@ export function generateReference(
   const periodKey = getPeriodKey(context.now, config.resetPolicy);
   const scopeKey = [config.scope, context.branchId, context.departmentId ?? "NONE", periodKey].join("|");
   const sequence = sequenceStore.next(scopeKey);
+
+  return {
+    value: renderPattern(config.pattern, context, sequence),
+    sequenceKey: scopeKey,
+    sequence,
+    configId: config.id
+  };
+}
+
+export async function generateReferenceAsync(
+  configs: ReferenceFormatConfig[],
+  context: ReferenceContext,
+  nextSequence: (key: string) => Promise<number>
+): Promise<GeneratedReference> {
+  const config = resolveConfig(configs, context);
+  const periodKey = getPeriodKey(context.now, config.resetPolicy);
+  const scopeKey = [config.scope, context.branchId, context.departmentId ?? "NONE", periodKey].join("|");
+  const sequence = await nextSequence(scopeKey);
 
   return {
     value: renderPattern(config.pattern, context, sequence),

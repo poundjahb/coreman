@@ -15,4 +15,22 @@ export class InMemoryBranchRepository implements IBranchRepository {
   async findAll(): Promise<Branch[]> {
     return [...this.store];
   }
+
+  async save(branch: Branch): Promise<void> {
+    const index = this.store.findIndex((item) => item.id === branch.id);
+
+    if (index >= 0) {
+      this.store[index] = branch;
+      return;
+    }
+
+    this.store.push(branch);
+  }
+
+  async delete(id: string): Promise<void> {
+    const index = this.store.findIndex((item) => item.id === id);
+    if (index >= 0) {
+      this.store.splice(index, 1);
+    }
+  }
 }

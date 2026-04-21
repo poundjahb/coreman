@@ -17,4 +17,18 @@ export class SqliteBranchRepository implements IBranchRepository {
   async findAll(): Promise<Branch[]> {
     return (this.db.prepare("SELECT * FROM branches").all() as Record<string, unknown>[]).map(rowToBranch);
   }
+
+  async save(branch: Branch): Promise<void> {
+    this.db.prepare(
+      `INSERT OR REPLACE INTO branches (id, code, name, isActive)
+       VALUES (@id, @code, @name, @isActive)`
+    ).run({
+      ...branch,
+      isActive: branch.isActive ? 1 : 0
+    });
+  }
+
+  async delete(id: string): Promise<void> {
+    this.db.prepare("DELETE FROM branches WHERE id = ?").run(id);
+  }
 }

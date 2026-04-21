@@ -1,0 +1,8 @@
+export const ALL_ROLE_CODES = [
+    "ADMIN",
+    "RECEPTIONIST",
+    "RECIPIENT",
+    "ACTION_OWNER",
+    "COPIED_VIEWER",
+    "DASHBOARD_VIEWER"
+];

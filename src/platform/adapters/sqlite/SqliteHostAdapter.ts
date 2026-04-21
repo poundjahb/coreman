@@ -54,10 +54,22 @@ export const sqliteHostAdapter: IHostAdapter = (() => {
     users: {
       findById: () => notReady("findById"),
       findAll: () => notReady("findAll"),
-      findByBranch: () => notReady("findByBranch")
+      findByBranch: () => notReady("findByBranch"),
+      save: () => notReady("save"),
+      delete: () => notReady("delete")
     },
-    branches: { findById: () => notReady("findById"), findAll: () => notReady("findAll") },
-    departments: { findById: () => notReady("findById"), findAll: () => notReady("findAll") },
+    branches: {
+      findById: () => notReady("findById"),
+      findAll: () => notReady("findAll"),
+      save: () => notReady("save"),
+      delete: () => notReady("delete")
+    },
+    departments: {
+      findById: () => notReady("findById"),
+      findAll: () => notReady("findAll"),
+      save: () => notReady("save"),
+      delete: () => notReady("delete")
+    },
     referenceConfigs: { findAll: () => notReady("findAll"), findActive: () => notReady("findActive") },
     notifications: { send: () => notReady("send") },
     sequenceStore: { next: () => notReady("next") }

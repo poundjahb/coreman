@@ -15,4 +15,22 @@ export class InMemoryDepartmentRepository implements IDepartmentRepository {
   async findAll(): Promise<Department[]> {
     return [...this.store];
   }
+
+  async save(department: Department): Promise<void> {
+    const index = this.store.findIndex((item) => item.id === department.id);
+
+    if (index >= 0) {
+      this.store[index] = department;
+      return;
+    }
+
+    this.store.push(department);
+  }
+
+  async delete(id: string): Promise<void> {
+    const index = this.store.findIndex((item) => item.id === id);
+    if (index >= 0) {
+      this.store.splice(index, 1);
+    }
+  }
 }

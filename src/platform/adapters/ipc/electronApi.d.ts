@@ -19,14 +19,20 @@ export interface ElectronAPI {
     findById(id: string): Promise<AppUser | null>;
     findAll(): Promise<AppUser[]>;
     findByBranch(branchId: string): Promise<AppUser[]>;
+    save(user: AppUser): Promise<void>;
+    delete(id: string): Promise<void>;
   };
   branches: {
     findById(id: string): Promise<Branch | null>;
     findAll(): Promise<Branch[]>;
+    save(branch: Branch): Promise<void>;
+    delete(id: string): Promise<void>;
   };
   departments: {
     findById(id: string): Promise<Department | null>;
     findAll(): Promise<Department[]>;
+    save(department: Department): Promise<void>;
+    delete(id: string): Promise<void>;
   };
   referenceConfigs: {
     findAll(): Promise<ReferenceFormatConfig[]>;

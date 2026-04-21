@@ -29,4 +29,23 @@ export class SqliteUserRepository implements IUserRepository {
       this.db.prepare("SELECT * FROM users WHERE branchId = ?").all(branchId) as Record<string, unknown>[]
     ).map(rowToUser);
   }
+
+  async save(user: AppUser): Promise<void> {
+    this.db.prepare(
+      `INSERT OR REPLACE INTO users
+        (id, employeeCode, fullName, email, branchId, departmentId, isActive, canLogin, canOwnActions, roles)
+       VALUES
+        (@id, @employeeCode, @fullName, @email, @branchId, @departmentId, @isActive, @canLogin, @canOwnActions, @roles)`
+    ).run({
+      ...user,
+      isActive: user.isActive ? 1 : 0,
+      canLogin: user.canLogin ? 1 : 0,
+      canOwnActions: user.canOwnActions ? 1 : 0,
+      roles: JSON.stringify(user.roles)
+    });
+  }
+
+  async delete(id: string): Promise<void> {
+    this.db.prepare("DELETE FROM users WHERE id = ?").run(id);
+  }
 }

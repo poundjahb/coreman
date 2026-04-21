@@ -30,15 +30,21 @@ export function createIpcHostAdapter(): IHostAdapter {
     users: {
       findById: (id) => api.users.findById(id),
       findAll: () => api.users.findAll(),
-      findByBranch: (branchId) => api.users.findByBranch(branchId)
+      findByBranch: (branchId) => api.users.findByBranch(branchId),
+      save: (user) => api.users.save(user),
+      delete: (id) => api.users.delete(id)
     },
     branches: {
       findById: (id) => api.branches.findById(id),
-      findAll: () => api.branches.findAll()
+      findAll: () => api.branches.findAll(),
+      save: (branch) => api.branches.save(branch),
+      delete: (id) => api.branches.delete(id)
     },
     departments: {
       findById: (id) => api.departments.findById(id),
-      findAll: () => api.departments.findAll()
+      findAll: () => api.departments.findAll(),
+      save: (department) => api.departments.save(department),
+      delete: (id) => api.departments.delete(id)
     },
     referenceConfigs: {
       findAll: () => api.referenceConfigs.findAll(),

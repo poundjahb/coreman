@@ -8,6 +8,15 @@ export type RoleCode =
   | "COPIED_VIEWER"
   | "DASHBOARD_VIEWER";
 
+export const ALL_ROLE_CODES: RoleCode[] = [
+  "ADMIN",
+  "RECEPTIONIST",
+  "RECIPIENT",
+  "ACTION_OWNER",
+  "COPIED_VIEWER",
+  "DASHBOARD_VIEWER"
+];
+
 export interface Branch {
   id: string;
   code: string;

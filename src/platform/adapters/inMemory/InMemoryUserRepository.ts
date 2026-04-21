@@ -19,4 +19,22 @@ export class InMemoryUserRepository implements IUserRepository {
   async findByBranch(branchId: string): Promise<AppUser[]> {
     return this.store.filter((u) => u.branchId === branchId);
   }
+
+  async save(user: AppUser): Promise<void> {
+    const index = this.store.findIndex((item) => item.id === user.id);
+
+    if (index >= 0) {
+      this.store[index] = user;
+      return;
+    }
+
+    this.store.push(user);
+  }
+
+  async delete(id: string): Promise<void> {
+    const index = this.store.findIndex((item) => item.id === id);
+    if (index >= 0) {
+      this.store.splice(index, 1);
+    }
+  }
 }
