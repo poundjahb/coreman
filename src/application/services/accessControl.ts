@@ -1,4 +1,4 @@
-import type { AppUser, RoleCode } from "../domain/governance";
+import type { AppUser, RoleCode } from "../../domain/governance";
 
 export function hasRole(user: AppUser, role: RoleCode): boolean {
   return user.roles.includes(role);

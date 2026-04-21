@@ -15,10 +15,10 @@ import {
   ThemeIcon,
   Title
 } from "@mantine/core";
-import { systemConfig } from "../config/systemConfig";
-import { validateAuthMode } from "../auth/modeGuard";
-import { demoReferenceConfigs, demoUsers } from "../modules/admin/seedData";
-import { registerCorrespondence } from "../modules/intake/registerCorrespondence";
+import { systemConfig } from "../../config/systemConfig";
+import { validateAuthMode } from "../../application/auth/modeGuard";
+import { demoReferenceConfigs, demoUsers } from "../../application/modules/admin/seedData";
+import { registerCorrespondence } from "../../application/modules/intake/registerCorrespondence";
 import { KpiCard } from "../components/KpiCard";
 import { KpiWindowSelector } from "../components/KpiWindowSelector";
 import { DataRow } from "../components/DataRow";

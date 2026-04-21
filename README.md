@@ -30,6 +30,11 @@ Initial implementation baseline for a Power Platform-oriented correspondence man
   - `src/platform/adapters/sqlite/` — SQLite adapter stub (raises not-implemented errors).
   - `src/platform/hostAdapterFactory.ts` — Factory that selects the adapter from `PlatformConfig`.
   - `src/config/systemConfig.ts` — Extended with `PlatformTarget` type and `platformConfig`.
+- **Four-Layer Architecture — folder structure enforced:**
+  - `src/ui/` (Layer 1) — React components (`src/ui/components/`), page screens (`src/ui/screens/`), and UI mock data (`src/ui/mocks/`).
+  - `src/application/` (Layer 2) — Application logic: auth guards (`src/application/auth/`), domain use-case modules (`src/application/modules/`), and pure services (`src/application/services/`).
+  - `src/domain/` (Layer 3) — Domain entities and value objects (unchanged).
+  - `src/platform/` (Layer 4) — Host abstraction, repository contracts, and adapter implementations (unchanged).
 
 ### Not yet implemented
 - Dataverse repository implementations (replace stubs).

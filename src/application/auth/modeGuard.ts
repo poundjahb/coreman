@@ -1,4 +1,4 @@
-import type { AuthMode, AppUser } from "../domain/governance";
+import type { AuthMode, AppUser } from "../../domain/governance";
 
 export interface AuthResult {
   success: boolean;

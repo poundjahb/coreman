@@ -3,7 +3,7 @@ import type {
   ReferenceContext,
   ReferenceFormatConfig,
   SequenceStore
-} from "../domain/reference";
+} from "../../domain/reference";
 
 function padSequence(rawValue: number, token: string): string {
   const size = Number(token.replace("SEQ", ""));

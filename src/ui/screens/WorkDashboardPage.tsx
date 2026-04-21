@@ -16,8 +16,8 @@ import {
 import { Link } from "react-router-dom";
 import { KpiCard } from "../components/KpiCard";
 import { correspondences, tasks } from "../mocks/uiData";
-import type { AppUser } from "../domain/governance";
-import { hasRole } from "../services/accessControl";
+import type { AppUser } from "../../domain/governance";
+import { hasRole } from "../../application/services/accessControl";
 
 interface WorkDashboardPageProps {
   currentUser: AppUser;
