@@ -1,59 +1,55 @@
 import type { IHostAdapter } from "../../IHostAdapter";
-import type { ICorrespondenceRepository } from "../../contracts/ICorrespondenceRepository";
-import type { IUserRepository } from "../../contracts/IUserRepository";
-import type { IBranchRepository } from "../../contracts/IBranchRepository";
-import type { IDepartmentRepository } from "../../contracts/IDepartmentRepository";
-import type { IReferenceConfigRepository } from "../../contracts/IReferenceConfigRepository";
-import type { INotificationService, NotificationPayload } from "../../contracts/INotificationService";
-import type { SequenceStore } from "../../../domain/reference";
+import { openDatabase } from "./SqliteDatabase";
+import { SqliteCorrespondenceRepository } from "./SqliteCorrespondenceRepository";
+import { SqliteUserRepository } from "./SqliteUserRepository";
+import { SqliteBranchRepository } from "./SqliteBranchRepository";
+import { SqliteDepartmentRepository } from "./SqliteDepartmentRepository";
+import { SqliteReferenceConfigRepository } from "./SqliteReferenceConfigRepository";
+import { SqliteNotificationService } from "./SqliteNotificationService";
+import { SqliteSequenceStore } from "./SqliteSequenceStore";
 
-function notImplemented(method: string): never {
-  throw new Error(`SqliteHostAdapter: ${method} is not yet implemented.`);
+/**
+ * Creates a fully wired SQLite host adapter.
+ * Call this from the Electron main process, passing the path to the .db file.
+ */
+export function createSqliteHostAdapter(dbPath: string): IHostAdapter {
+  const db = openDatabase(dbPath);
+  return {
+    correspondences: new SqliteCorrespondenceRepository(db),
+    users: new SqliteUserRepository(db),
+    branches: new SqliteBranchRepository(db),
+    departments: new SqliteDepartmentRepository(db),
+    referenceConfigs: new SqliteReferenceConfigRepository(db),
+    notifications: new SqliteNotificationService(db),
+    sequenceStore: new SqliteSequenceStore(db)
+  };
 }
 
-const sqliteCorrespondenceRepository: ICorrespondenceRepository = {
-  findById: (_id) => notImplemented("correspondences.findById"),
-  findAll: () => notImplemented("correspondences.findAll"),
-  findByBranch: (_branchId) => notImplemented("correspondences.findByBranch"),
-  save: (_c) => notImplemented("correspondences.save"),
-  update: (_id, _changes) => notImplemented("correspondences.update")
-};
-
-const sqliteUserRepository: IUserRepository = {
-  findById: (_id) => notImplemented("users.findById"),
-  findAll: () => notImplemented("users.findAll"),
-  findByBranch: (_branchId) => notImplemented("users.findByBranch")
-};
-
-const sqliteBranchRepository: IBranchRepository = {
-  findById: (_id) => notImplemented("branches.findById"),
-  findAll: () => notImplemented("branches.findAll")
-};
-
-const sqliteDepartmentRepository: IDepartmentRepository = {
-  findById: (_id) => notImplemented("departments.findById"),
-  findAll: () => notImplemented("departments.findAll")
-};
-
-const sqliteReferenceConfigRepository: IReferenceConfigRepository = {
-  findAll: () => notImplemented("referenceConfigs.findAll"),
-  findActive: () => notImplemented("referenceConfigs.findActive")
-};
-
-const sqliteNotificationService: INotificationService = {
-  send: (_payload: NotificationPayload) => notImplemented("notifications.send")
-};
-
-const sqliteSequenceStore: SequenceStore = {
-  next: (_key: string) => notImplemented("sequenceStore.next")
-};
-
-export const sqliteHostAdapter: IHostAdapter = {
-  correspondences: sqliteCorrespondenceRepository,
-  users: sqliteUserRepository,
-  branches: sqliteBranchRepository,
-  departments: sqliteDepartmentRepository,
-  referenceConfigs: sqliteReferenceConfigRepository,
-  notifications: sqliteNotificationService,
-  sequenceStore: sqliteSequenceStore
-};
+/**
+ * Placeholder exported for hostAdapterFactory compatibility.
+ * Replace with createSqliteHostAdapter(dbPath) once Electron main process is wired.
+ */
+export const sqliteHostAdapter: IHostAdapter = (() => {
+  function notReady(method: string): never {
+    throw new Error(`SqliteHostAdapter: call createSqliteHostAdapter(dbPath) — ${method} unavailable`);
+  }
+  return {
+    correspondences: {
+      findById: () => notReady("findById"),
+      findAll: () => notReady("findAll"),
+      findByBranch: () => notReady("findByBranch"),
+      save: () => notReady("save"),
+      update: () => notReady("update")
+    },
+    users: {
+      findById: () => notReady("findById"),
+      findAll: () => notReady("findAll"),
+      findByBranch: () => notReady("findByBranch")
+    },
+    branches: { findById: () => notReady("findById"), findAll: () => notReady("findAll") },
+    departments: { findById: () => notReady("findById"), findAll: () => notReady("findAll") },
+    referenceConfigs: { findAll: () => notReady("findAll"), findActive: () => notReady("findActive") },
+    notifications: { send: () => notReady("send") },
+    sequenceStore: { next: () => notReady("next") }
+  };
+})();

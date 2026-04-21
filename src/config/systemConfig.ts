@@ -12,7 +12,7 @@ export const systemConfig: SystemConfig = {
 };
 
 export const platformConfig: PlatformConfig = {
-  target: "IN_MEMORY"
+  target: "SQLITE"
 };
 
 export function setAuthMode(config: SystemConfig, nextMode: SystemConfig["authMode"]): SystemConfig {
