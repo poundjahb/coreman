@@ -40,6 +40,8 @@ import { Navigate, NavLink as RouterNavLink, Route, Routes, useLocation } from "
 import type { AppUser, RoleCode } from "./domain/governance";
 import { hasRole } from "./application/services/accessControl";
 import { demoUsers } from "./application/modules/admin/seedData";
+import { getPlatformIndicator } from "./platform/hostAdapterFactory";
+import { getRuntimePlatformTarget } from "./platform/runtimePlatformTarget";
 import { AccessDeniedState } from "./ui/components/AccessDeniedState";
 import { ReceptionistDashboardPage } from "./ui/screens/ReceptionistDashboardPage";
 import { ReceptionistHistoryPage } from "./ui/screens/ReceptionistHistoryPage";
@@ -197,6 +199,11 @@ export function App(): JSX.Element {
   const [currentUserId, setCurrentUserId] = useState<string>(demoUsers[0].id);
   const [menuOpened, setMenuOpened] = useState(true);
   const location = useLocation();
+  const runtimePlatformTarget = useMemo(() => getRuntimePlatformTarget(), []);
+  const platformIndicator = useMemo(
+    () => getPlatformIndicator(runtimePlatformTarget),
+    [runtimePlatformTarget]
+  );
 
   const currentUser = useMemo(
     () => demoUsers.find((user) => user.id === currentUserId) ?? demoUsers[0],
@@ -214,7 +221,17 @@ export function App(): JSX.Element {
             <Group justify="space-between" align="start" wrap="nowrap">
               {!navbarCollapsed && (
                 <div>
-                  <Title order={4}>Correspondence</Title>
+                  <Group gap={6} align="center" wrap="nowrap">
+                    <Title order={4}>Correspondence</Title>
+                    <img
+                      src={platformIndicator.iconDataUrl}
+                      width={14}
+                      height={14}
+                      alt={platformIndicator.label}
+                      title={`${platformIndicator.label} platform`}
+                      style={{ display: "block", opacity: 0.8 }}
+                    />
+                  </Group>
                   <Text size="xs" c="dimmed">Operations workspace</Text>
                 </div>
               )}

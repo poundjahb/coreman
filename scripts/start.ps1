@@ -1,7 +1,16 @@
 $ErrorActionPreference = "Stop"
 
-$rootDir = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+param(
+	[ValidateSet("SQLITE", "IN_MEMORY", "DATAVERSE")]
+	[string]$Platform = "SQLITE"
+)
 
-Set-Location -Path $rootDir
-Write-Host "Starting application in this terminal. Press Ctrl+C to stop."
-& npm.cmd run dev
+$runnerByPlatform = @{
+	"SQLITE" = "start-sqlite.ps1"
+	"IN_MEMORY" = "start-inmemory.ps1"
+	"DATAVERSE" = "start-dataverse.ps1"
+}
+
+$scriptToRun = Join-Path $PSScriptRoot $runnerByPlatform[$Platform]
+Write-Host "Delegating to $($runnerByPlatform[$Platform])"
+& $scriptToRun

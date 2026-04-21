@@ -9,6 +9,14 @@ import { InMemoryDepartmentRepository } from "./InMemoryDepartmentRepository";
 import { InMemoryNotificationService } from "./InMemoryNotificationService";
 import { InMemoryReferenceConfigRepository } from "./InMemoryReferenceConfigRepository";
 import { InMemoryUserRepository } from "./InMemoryUserRepository";
+import { buildPlatformIndicator } from "../../platformIndicator";
+
+export const inMemoryPlatformIndicator = buildPlatformIndicator({
+  target: "IN_MEMORY",
+  label: "In-memory",
+  initials: "IM",
+  backgroundColor: "#2f8f58"
+});
 
 const seedBranches: Branch[] = [
   { id: "b-001", code: "HQ", name: "Headquarters", isActive: true },
@@ -73,6 +81,7 @@ const seedCorrespondences: Correspondence[] = [
 
 export function createInMemoryHostAdapter(): IHostAdapter {
   return {
+    platform: inMemoryPlatformIndicator,
     correspondences: new InMemoryCorrespondenceRepository(seedCorrespondences),
     users: new InMemoryUserRepository(demoUsers),
     branches: new InMemoryBranchRepository(seedBranches),

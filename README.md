@@ -66,8 +66,35 @@ Node.js and npm are required but currently unavailable in this machine session. 
 
 ```powershell
 npm install
-npm run dev
+cd .\scripts
+
+# SQLITE (Electron + IPC)
+.\start-sqlite.ps1
+
+# IN_MEMORY (Vite web mode)
+.\start-inmemory.ps1
+
+# DATAVERSE (Vite web mode)
+.\start-dataverse.ps1
 ```
+
+Optional dispatcher scripts (default target is SQLITE):
+
+```powershell
+.\start.ps1 -Platform SQLITE
+.\start.ps1 -Platform IN_MEMORY
+.\start.ps1 -Platform DATAVERSE
+```
+
+Stop commands:
+
+```powershell
+.\stop-sqlite.ps1
+.\stop-inmemory.ps1
+.\stop-dataverse.ps1
+```
+
+The active platform is also exposed to the renderer with `VITE_PLATFORM_TARGET` and shown in the app header by a generated icon produced by each platform adapter.
 
 ## Next Implementation Target
 - Implement Phase 2 persistence adapters (Dataverse repositories) and API contracts for app-triggered notification flows.

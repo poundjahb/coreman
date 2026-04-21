@@ -1,11 +1,16 @@
 $ErrorActionPreference = "Stop"
 
-$rootDir = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
-$pidFile = Join-Path $rootDir ".app.pid"
+param(
+    [ValidateSet("SQLITE", "IN_MEMORY", "DATAVERSE")]
+    [string]$Platform = "SQLITE"
+)
 
-if (Test-Path $pidFile) {
-    Remove-Item -Path $pidFile -Force
+$runnerByPlatform = @{
+    "SQLITE" = "stop-sqlite.ps1"
+    "IN_MEMORY" = "stop-inmemory.ps1"
+    "DATAVERSE" = "stop-dataverse.ps1"
 }
 
-Write-Host "Application now runs in the current terminal."
-Write-Host "To stop it, focus that terminal and press Ctrl+C."
+$scriptToRun = Join-Path $PSScriptRoot $runnerByPlatform[$Platform]
+Write-Host "Delegating to $($runnerByPlatform[$Platform])"
+& $scriptToRun

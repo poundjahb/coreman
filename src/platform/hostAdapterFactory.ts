@@ -1,8 +1,8 @@
 import type { PlatformTarget } from "../config/systemConfig";
-import type { IHostAdapter } from "./IHostAdapter";
-import { createInMemoryHostAdapter } from "./adapters/inMemory/InMemoryHostAdapter";
-import { dataverseHostAdapter } from "./adapters/dataverse/DataverseHostAdapter";
-import { createIpcHostAdapter } from "./adapters/ipc/IpcHostAdapter";
+import type { IHostAdapter, PlatformIndicator } from "./IHostAdapter";
+import { createInMemoryHostAdapter, inMemoryPlatformIndicator } from "./adapters/inMemory/InMemoryHostAdapter";
+import { dataverseHostAdapter, dataversePlatformIndicator } from "./adapters/dataverse/DataverseHostAdapter";
+import { createIpcHostAdapter, sqlitePlatformIndicator } from "./adapters/ipc/IpcHostAdapter";
 
 /**
  * Returns the appropriate host adapter for the current platform target.
@@ -22,5 +22,16 @@ export function createHostAdapter(target: PlatformTarget): IHostAdapter {
       return createIpcHostAdapter();
     case "IN_MEMORY":
       return createInMemoryHostAdapter();
+  }
+}
+
+export function getPlatformIndicator(target: PlatformTarget): PlatformIndicator {
+  switch (target) {
+    case "DATAVERSE":
+      return dataversePlatformIndicator;
+    case "SQLITE":
+      return sqlitePlatformIndicator;
+    case "IN_MEMORY":
+      return inMemoryPlatformIndicator;
   }
 }

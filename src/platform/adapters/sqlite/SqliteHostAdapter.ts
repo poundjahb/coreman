@@ -7,6 +7,14 @@ import { SqliteDepartmentRepository } from "./SqliteDepartmentRepository";
 import { SqliteReferenceConfigRepository } from "./SqliteReferenceConfigRepository";
 import { SqliteNotificationService } from "./SqliteNotificationService";
 import { SqliteSequenceStore } from "./SqliteSequenceStore";
+import { buildPlatformIndicator } from "../../platformIndicator";
+
+export const sqliteMainProcessPlatformIndicator = buildPlatformIndicator({
+  target: "SQLITE",
+  label: "SQLite (Main)",
+  initials: "SQ",
+  backgroundColor: "#5742d6"
+});
 
 /**
  * Creates a fully wired SQLite host adapter.
@@ -15,6 +23,7 @@ import { SqliteSequenceStore } from "./SqliteSequenceStore";
 export function createSqliteHostAdapter(dbPath: string): IHostAdapter {
   const db = openDatabase(dbPath);
   return {
+    platform: sqliteMainProcessPlatformIndicator,
     correspondences: new SqliteCorrespondenceRepository(db),
     users: new SqliteUserRepository(db),
     branches: new SqliteBranchRepository(db),
@@ -34,6 +43,7 @@ export const sqliteHostAdapter: IHostAdapter = (() => {
     throw new Error(`SqliteHostAdapter: call createSqliteHostAdapter(dbPath) — ${method} unavailable`);
   }
   return {
+    platform: sqliteMainProcessPlatformIndicator,
     correspondences: {
       findById: () => notReady("findById"),
       findAll: () => notReady("findAll"),

@@ -6,6 +6,14 @@ import type { IDepartmentRepository } from "../../contracts/IDepartmentRepositor
 import type { IReferenceConfigRepository } from "../../contracts/IReferenceConfigRepository";
 import type { INotificationService, NotificationPayload } from "../../contracts/INotificationService";
 import type { SequenceStore } from "../../../domain/reference";
+import { buildPlatformIndicator } from "../../platformIndicator";
+
+export const dataversePlatformIndicator = buildPlatformIndicator({
+  target: "DATAVERSE",
+  label: "Dataverse",
+  initials: "DV",
+  backgroundColor: "#1366d9"
+});
 
 function notImplemented(method: string): never {
   throw new Error(`DataverseHostAdapter: ${method} is not yet implemented.`);
@@ -49,6 +57,7 @@ const dataverseSequenceStore: SequenceStore = {
 };
 
 export const dataverseHostAdapter: IHostAdapter = {
+  platform: dataversePlatformIndicator,
   correspondences: dataverseCorrespondenceRepository,
   users: dataverseUserRepository,
   branches: dataverseBranchRepository,

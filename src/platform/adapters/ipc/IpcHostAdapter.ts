@@ -1,5 +1,13 @@
 import type { IHostAdapter } from "../../IHostAdapter";
 import "./electronApi.d.ts";
+import { buildPlatformIndicator } from "../../platformIndicator";
+
+export const sqlitePlatformIndicator = buildPlatformIndicator({
+  target: "SQLITE",
+  label: "SQLite (Electron)",
+  initials: "SQ",
+  backgroundColor: "#5742d6"
+});
 
 /**
  * Renderer-side host adapter. Each method delegates to the Electron main process
@@ -11,6 +19,7 @@ import "./electronApi.d.ts";
 export function createIpcHostAdapter(): IHostAdapter {
   const api = window.electronAPI;
   return {
+    platform: sqlitePlatformIndicator,
     correspondences: {
       findById: (id) => api.correspondences.findById(id),
       findAll: () => api.correspondences.findAll(),
