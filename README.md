@@ -18,8 +18,22 @@ Initial implementation baseline for a Power Platform-oriented correspondence man
   - ORG, BRANCH, DEPT, YYYY, YY, MM, DD, SEQn
 - Intake module baseline that generates references in-app for receptionist flow.
 
+### Implemented now (continued)
+- **Platform Abstraction Layer (PAL) — Step 1 structural scaffold:**
+  - `src/domain/correspondence.ts` — Correspondence domain entity with direction and status enums.
+  - `src/platform/contracts/` — Repository and service contracts:
+    - `ICorrespondenceRepository`, `IUserRepository`, `IBranchRepository`, `IDepartmentRepository`
+    - `IReferenceConfigRepository`, `INotificationService`
+  - `src/platform/IHostAdapter.ts` — Aggregated host adapter interface.
+  - `src/platform/adapters/inMemory/` — Fully wired in-memory adapter backed by seed data.
+  - `src/platform/adapters/dataverse/` — Dataverse adapter stub (raises not-implemented errors).
+  - `src/platform/adapters/sqlite/` — SQLite adapter stub (raises not-implemented errors).
+  - `src/platform/hostAdapterFactory.ts` — Factory that selects the adapter from `PlatformConfig`.
+  - `src/config/systemConfig.ts` — Extended with `PlatformTarget` type and `platformConfig`.
+
 ### Not yet implemented
-- Dataverse integration and persistence.
+- Dataverse repository implementations (replace stubs).
+- SQLite repository implementations (replace stubs).
 - Power Automate flow triggers.
 - Scheduler-based deadline monitoring flow integration.
 - Complete action lifecycle UI and APIs.
