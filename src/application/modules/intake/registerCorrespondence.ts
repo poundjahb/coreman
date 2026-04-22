@@ -1,4 +1,5 @@
 import type { Correspondence } from "../../../domain/correspondence";
+import { getRuntimeWorkflowMode } from "../../../config/systemConfig";
 import type { AppUser } from "../../../domain/governance";
 import type { ReferenceFormatConfig } from "../../../domain/reference";
 import type { IHostAdapter } from "../../../platform/IHostAdapter";
@@ -39,6 +40,8 @@ export interface RegisterCorrespondenceCommand {
   dueDate?: Date;
   recipientId?: AppUser["id"];
   actionOwnerId?: AppUser["id"];
+  /** Optional scanned/digital content, encoded by caller. */
+  digitalContent?: string;
 }
 
 const sequenceStore = new InMemorySequenceStore();
@@ -162,6 +165,37 @@ export async function registerCorrespondenceInHost(
   }
 
   await hostAdapter.correspondences.save(correspondence);
+
+  const workflowMode = getRuntimeWorkflowMode();
+  try {
+    await hostAdapter.postCaptureWorkflow.execute({
+      correspondence,
+      actor,
+      mode: workflowMode,
+      context: {
+        digitalContent: input.digitalContent,
+        metadata: {
+          branchId: correspondence.branchId,
+          departmentId: correspondence.departmentId,
+          direction: correspondence.direction,
+          fromTo: correspondence.fromTo
+        }
+      }
+    });
+  } catch (error) {
+    try {
+      await hostAdapter.correspondenceAuditLog.append({
+        correspondenceId: correspondence.id,
+        eventType: "WORKFLOW_FAILURE",
+        status: "FAILED",
+        payloadJson: JSON.stringify({ mode: workflowMode }),
+        errorMessage: error instanceof Error ? error.message : "Post-capture workflow failed",
+        createdById: actor.id
+      });
+    } catch {
+      // Preserve successful capture even when workflow and fallback audit both fail.
+    }
+  }
 
   return {
     correspondenceId: correspondence.id,

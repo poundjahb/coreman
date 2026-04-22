@@ -4,7 +4,9 @@ import { createSqliteHostAdapter } from "../src/platform/adapters/sqlite/SqliteH
 import type { IHostAdapter } from "../src/platform/IHostAdapter";
 import type { Correspondence } from "../src/domain/correspondence";
 import type { AppUser, Branch, Department } from "../src/domain/governance";
+import type { CreateCorrespondenceAuditEvent } from "../src/platform/contracts/ICorrespondenceAuditLogRepository";
 import type { NotificationPayload } from "../src/platform/contracts/INotificationService";
+import type { ExecutePostCaptureWorkflowCommand } from "../src/platform/contracts/IPostCaptureWorkflowService";
 
 let adapter: IHostAdapter;
 
@@ -74,6 +76,19 @@ function registerIpcHandlers(): void {
   // notifications
   ipcMain.handle("notifications:send", (_e, payload: NotificationPayload) =>
     adapter.notifications.send(payload)
+  );
+
+  // correspondenceAuditLog
+  ipcMain.handle("correspondenceAuditLog:append", (_e, event: CreateCorrespondenceAuditEvent) =>
+    adapter.correspondenceAuditLog.append(event)
+  );
+  ipcMain.handle("correspondenceAuditLog:findByCorrespondence", (_e, correspondenceId: string) =>
+    adapter.correspondenceAuditLog.findByCorrespondence(correspondenceId)
+  );
+
+  // postCaptureWorkflow
+  ipcMain.handle("postCaptureWorkflow:execute", (_e, command: ExecutePostCaptureWorkflowCommand) =>
+    adapter.postCaptureWorkflow.execute(command)
   );
 
   // sequenceStore — runs in main process where SQLite is available

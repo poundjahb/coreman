@@ -53,6 +53,13 @@ export function createIpcHostAdapter(): IHostAdapter {
     notifications: {
       send: (payload) => api.notifications.send(payload)
     },
+    correspondenceAuditLog: {
+      append: (event) => api.correspondenceAuditLog.append(event),
+      findByCorrespondence: (correspondenceId) => api.correspondenceAuditLog.findByCorrespondence(correspondenceId)
+    },
+    postCaptureWorkflow: {
+      execute: (command) => api.postCaptureWorkflow.execute(command)
+    },
     sequenceStore: {
       next(_key: string): number {
         throw new Error(

@@ -1,7 +1,12 @@
 import type { Correspondence } from "../../../domain/correspondence";
 import type { AppUser, Branch, Department } from "../../../domain/governance";
 import type { ReferenceFormatConfig } from "../../../domain/reference";
+import type {
+  CorrespondenceAuditEvent,
+  CreateCorrespondenceAuditEvent
+} from "../../contracts/ICorrespondenceAuditLogRepository";
 import type { NotificationPayload } from "../../contracts/INotificationService";
+import type { ExecutePostCaptureWorkflowCommand } from "../../contracts/IPostCaptureWorkflowService";
 
 /**
  * Shape of window.electronAPI injected by electron/preload.ts via contextBridge.
@@ -40,6 +45,13 @@ export interface ElectronAPI {
   };
   notifications: {
     send(payload: NotificationPayload): Promise<void>;
+  };
+  correspondenceAuditLog: {
+    append(event: CreateCorrespondenceAuditEvent): Promise<CorrespondenceAuditEvent>;
+    findByCorrespondence(correspondenceId: string): Promise<CorrespondenceAuditEvent[]>;
+  };
+  postCaptureWorkflow: {
+    execute(command: ExecutePostCaptureWorkflowCommand): Promise<void>;
   };
   sequenceStore: {
     next(key: string): Promise<number>;

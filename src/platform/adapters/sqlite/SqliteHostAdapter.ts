@@ -8,6 +8,21 @@ import { SqliteReferenceConfigRepository } from "./SqliteReferenceConfigReposito
 import { SqliteNotificationService } from "./SqliteNotificationService";
 import { SqliteSequenceStore } from "./SqliteSequenceStore";
 import { buildPlatformIndicator } from "../../platformIndicator";
+import type { ICorrespondenceAuditLogRepository } from "../../contracts/ICorrespondenceAuditLogRepository";
+import type { IPostCaptureWorkflowService } from "../../contracts/IPostCaptureWorkflowService";
+
+const pendingCorrespondenceAuditLog: ICorrespondenceAuditLogRepository = {
+  append: async () => {
+    throw new Error("Sqlite correspondence audit log is not implemented yet.");
+  },
+  findByCorrespondence: async () => []
+};
+
+const pendingPostCaptureWorkflow: IPostCaptureWorkflowService = {
+  execute: async () => {
+    throw new Error("Sqlite post-capture workflow is not implemented yet.");
+  }
+};
 
 export const sqliteMainProcessPlatformIndicator = buildPlatformIndicator({
   target: "SQLITE",
@@ -30,6 +45,8 @@ export function createSqliteHostAdapter(dbPath: string): IHostAdapter {
     departments: new SqliteDepartmentRepository(db),
     referenceConfigs: new SqliteReferenceConfigRepository(db),
     notifications: new SqliteNotificationService(db),
+    correspondenceAuditLog: pendingCorrespondenceAuditLog,
+    postCaptureWorkflow: pendingPostCaptureWorkflow,
     sequenceStore: new SqliteSequenceStore(db)
   };
 }
@@ -72,6 +89,11 @@ export const sqliteHostAdapter: IHostAdapter = (() => {
     },
     referenceConfigs: { findAll: () => notReady("findAll"), findActive: () => notReady("findActive") },
     notifications: { send: () => notReady("send") },
+    correspondenceAuditLog: {
+      append: () => notReady("append"),
+      findByCorrespondence: () => notReady("findByCorrespondence")
+    },
+    postCaptureWorkflow: { execute: () => notReady("execute") },
     sequenceStore: { next: () => notReady("next") }
   };
 })();

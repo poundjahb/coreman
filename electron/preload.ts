@@ -1,6 +1,11 @@
 import { contextBridge, ipcRenderer } from "electron";
 import type { Correspondence } from "../src/domain/correspondence";
+import type {
+  CorrespondenceAuditEvent,
+  CreateCorrespondenceAuditEvent
+} from "../src/platform/contracts/ICorrespondenceAuditLogRepository";
 import type { NotificationPayload } from "../src/platform/contracts/INotificationService";
+import type { ExecutePostCaptureWorkflowCommand } from "../src/platform/contracts/IPostCaptureWorkflowService";
 
 contextBridge.exposeInMainWorld("electronAPI", {
   correspondences: {
@@ -37,6 +42,16 @@ contextBridge.exposeInMainWorld("electronAPI", {
   },
   notifications: {
     send: (payload: NotificationPayload) => ipcRenderer.invoke("notifications:send", payload)
+  },
+  correspondenceAuditLog: {
+    append: (event: CreateCorrespondenceAuditEvent): Promise<CorrespondenceAuditEvent> =>
+      ipcRenderer.invoke("correspondenceAuditLog:append", event),
+    findByCorrespondence: (correspondenceId: string): Promise<CorrespondenceAuditEvent[]> =>
+      ipcRenderer.invoke("correspondenceAuditLog:findByCorrespondence", correspondenceId)
+  },
+  postCaptureWorkflow: {
+    execute: (command: ExecutePostCaptureWorkflowCommand) =>
+      ipcRenderer.invoke("postCaptureWorkflow:execute", command)
   },
   sequenceStore: {
     next: (key: string) => ipcRenderer.invoke("sequenceStore:next", key)

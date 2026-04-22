@@ -16,7 +16,9 @@
   },
   "dependencies": {
     "@mantine/core": "^7.17.8",
+    "@mantine/dropzone": "^7.17.8",
     "@mantine/hooks": "^7.17.8",
+    "@mantine/notifications": "^7.17.8",
     "better-sqlite3": "^12.9.0",
     "lucide-react": "^0.469.0",
     "postcss-preset-mantine": "^1.18.0",
@@ -47,10 +49,22 @@
       "dist-electron/**"
     ],
     "extraResources": [
-      { "from": "node_modules/better-sqlite3/build/Release", "to": "native", "filter": ["*.node"] }
+      {
+        "from": "node_modules/better-sqlite3/build/Release",
+        "to": "native",
+        "filter": [
+          "*.node"
+        ]
+      }
     ],
-    "win": { "target": "nsis" },
-    "mac": { "target": "dmg" },
-    "linux": { "target": "AppImage" }
+    "win": {
+      "target": "nsis"
+    },
+    "mac": {
+      "target": "dmg"
+    },
+    "linux": {
+      "target": "AppImage"
+    }
   }
 }

@@ -1,5 +1,6 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import {
+  Anchor,
   Badge,
   Button,
   Card,
@@ -18,12 +19,14 @@ import { KpiCard } from "../components/KpiCard";
 import { correspondences, tasks } from "../mocks/uiData";
 import type { AppUser } from "../../domain/governance";
 import { hasRole } from "../../application/services/accessControl";
+import { CorrespondenceDetailsDrawer } from "../components/CorrespondenceDetailsDrawer";
 
 interface WorkDashboardPageProps {
   currentUser: AppUser;
 }
 
 export function WorkDashboardPage({ currentUser }: WorkDashboardPageProps): JSX.Element {
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const pending = tasks.filter((task) => task.status !== "Completed");
 
   const stats = useMemo(() => {
@@ -42,6 +45,7 @@ export function WorkDashboardPage({ currentUser }: WorkDashboardPageProps): JSX.
 
   const isRecipient = hasRole(currentUser, "RECIPIENT") || hasRole(currentUser, "ADMIN");
   const isActionOwner = hasRole(currentUser, "ACTION_OWNER") || hasRole(currentUser, "ADMIN");
+  const selectedCorrespondence = correspondences.find((item) => item.id === selectedId) ?? null;
 
   return (
     <Container size="xl" py="lg">
@@ -77,7 +81,11 @@ export function WorkDashboardPage({ currentUser }: WorkDashboardPageProps): JSX.
               <Table.Tbody>
                 {correspondences.map((row) => (
                   <Table.Tr key={row.id}>
-                    <Table.Td>{row.reference}</Table.Td>
+                    <Table.Td>
+                      <Anchor component="button" type="button" onClick={() => setSelectedId(row.id)}>
+                        {row.reference}
+                      </Anchor>
+                    </Table.Td>
                     <Table.Td>{row.subject}</Table.Td>
                     <Table.Td>{row.status}</Table.Td>
                     <Table.Td>{row.actionOwner}</Table.Td>
@@ -107,6 +115,24 @@ export function WorkDashboardPage({ currentUser }: WorkDashboardPageProps): JSX.
             </Table>
           </Table.ScrollContainer>
         </Card>
+
+        <CorrespondenceDetailsDrawer
+          opened={Boolean(selectedCorrespondence)}
+          onClose={() => setSelectedId(null)}
+          reference={selectedCorrespondence?.reference ?? ""}
+          subject={selectedCorrespondence?.subject ?? ""}
+          direction={selectedCorrespondence?.direction}
+          status={selectedCorrespondence?.status}
+          fields={[
+            { label: "Received Date", value: selectedCorrespondence?.receivedDate ?? "" },
+            { label: "Due Date", value: selectedCorrespondence?.dueDate ?? "" },
+            { label: "Branch", value: selectedCorrespondence?.branch ?? "" },
+            { label: "Department", value: selectedCorrespondence?.department ?? "" },
+            { label: "Receptionist", value: selectedCorrespondence?.receptionist ?? "" },
+            { label: "Recipient", value: selectedCorrespondence?.recipient ?? "" },
+            { label: "Action Owner", value: selectedCorrespondence?.actionOwner ?? "" }
+          ]}
+        />
 
         <Card withBorder radius="md" p="md">
           <Group justify="space-between" mb="sm">

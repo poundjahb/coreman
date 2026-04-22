@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import {
+  Anchor,
   Alert,
   Badge,
   Button,
@@ -19,6 +20,7 @@ import type { Correspondence } from "../../domain/correspondence";
 import type { AppUser, Branch, Department } from "../../domain/governance";
 import { hasRole } from "../../application/services/accessControl";
 import { runtimeHostAdapter } from "../../platform/runtimeHostAdapter";
+import { CorrespondenceDetailsDrawer } from "../components/CorrespondenceDetailsDrawer";
 
 const DIRECTION_OPTIONS = [
   { value: "all", label: "All" },
@@ -63,6 +65,7 @@ export function ReceptionistDashboardPage(props: { currentUser: AppUser }): JSX.
   const [departments, setDepartments] = useState<Department[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -131,6 +134,11 @@ export function ReceptionistDashboardPage(props: { currentUser: AppUser }): JSX.
       }));
   }, [branches, departments, direction, query, records, status]);
 
+  const selectedCorrespondence = useMemo(
+    () => rows.find((item) => item.id === selectedId) ?? null,
+    [rows, selectedId]
+  );
+
   return (
     <Container size="xl" py="lg">
       <Stack gap="lg">
@@ -196,7 +204,11 @@ export function ReceptionistDashboardPage(props: { currentUser: AppUser }): JSX.
               <Table.Tbody>
                 {rows.map((row) => (
                   <Table.Tr key={row.id}>
-                    <Table.Td>{row.reference}</Table.Td>
+                    <Table.Td>
+                      <Anchor component="button" type="button" onClick={() => setSelectedId(row.id)}>
+                        {row.reference}
+                      </Anchor>
+                    </Table.Td>
                     <Table.Td>{row.subject}</Table.Td>
                     <Table.Td>{formatDirection(row.direction)}</Table.Td>
                     <Table.Td>{row.branchName}</Table.Td>
@@ -212,6 +224,23 @@ export function ReceptionistDashboardPage(props: { currentUser: AppUser }): JSX.
           </Table.ScrollContainer>
           {!loading && rows.length === 0 && <Text c="dimmed" size="sm">No correspondence matched your filters.</Text>}
         </Card>
+
+        <CorrespondenceDetailsDrawer
+          opened={Boolean(selectedCorrespondence)}
+          onClose={() => setSelectedId(null)}
+          reference={selectedCorrespondence?.reference ?? ""}
+          subject={selectedCorrespondence?.subject ?? ""}
+          direction={selectedCorrespondence ? formatDirection(selectedCorrespondence.direction) : undefined}
+          status={selectedCorrespondence ? formatStatus(selectedCorrespondence.status) : undefined}
+          fields={[
+            { label: "Received Date", value: selectedCorrespondence ? formatDate(selectedCorrespondence.receivedDate) : "" },
+            { label: "Due Date", value: selectedCorrespondence ? formatDate(selectedCorrespondence.dueDate) : "" },
+            { label: "Branch", value: selectedCorrespondence?.branchName ?? "" },
+            { label: "Department", value: selectedCorrespondence?.departmentName ?? "" },
+            { label: "Recipient", value: selectedCorrespondence?.recipientId ?? "" },
+            { label: "Action Owner", value: selectedCorrespondence?.actionOwnerId ?? "" }
+          ]}
+        />
       </Stack>
     </Container>
   );

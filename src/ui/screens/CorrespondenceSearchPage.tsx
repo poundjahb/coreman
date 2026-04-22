@@ -1,12 +1,14 @@
 import { useMemo, useState } from "react";
-import { Badge, Card, Container, Group, Select, Stack, Table, Text, TextInput, Title } from "@mantine/core";
+import { Anchor, Badge, Card, Container, Group, Select, Stack, Table, Text, TextInput, Title } from "@mantine/core";
 import { correspondences } from "../mocks/uiData";
+import { CorrespondenceDetailsDrawer } from "../components/CorrespondenceDetailsDrawer";
 
 export function CorrespondenceSearchPage(): JSX.Element {
   const [reference, setReference] = useState("");
   const [subject, setSubject] = useState("");
   const [branch, setBranch] = useState<string | null>("all");
   const [status, setStatus] = useState<string | null>("all");
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const rows = useMemo(() => {
     return correspondences
@@ -15,6 +17,11 @@ export function CorrespondenceSearchPage(): JSX.Element {
       .filter((item) => item.reference.toLowerCase().includes(reference.trim().toLowerCase()))
       .filter((item) => item.subject.toLowerCase().includes(subject.trim().toLowerCase()));
   }, [reference, subject, branch, status]);
+
+  const selectedCorrespondence = useMemo(
+    () => rows.find((item) => item.id === selectedId) ?? null,
+    [rows, selectedId]
+  );
 
   return (
     <Container size="xl" py="lg">
@@ -79,7 +86,11 @@ export function CorrespondenceSearchPage(): JSX.Element {
               <Table.Tbody>
                 {rows.map((row) => (
                   <Table.Tr key={row.id}>
-                    <Table.Td>{row.reference}</Table.Td>
+                    <Table.Td>
+                      <Anchor component="button" type="button" onClick={() => setSelectedId(row.id)}>
+                        {row.reference}
+                      </Anchor>
+                    </Table.Td>
                     <Table.Td>{row.subject}</Table.Td>
                     <Table.Td>{row.branch}</Table.Td>
                     <Table.Td>{row.department}</Table.Td>
@@ -92,6 +103,24 @@ export function CorrespondenceSearchPage(): JSX.Element {
           </Table.ScrollContainer>
           {rows.length === 0 && <Text c="dimmed" size="sm">No correspondence found.</Text>}
         </Card>
+
+        <CorrespondenceDetailsDrawer
+          opened={Boolean(selectedCorrespondence)}
+          onClose={() => setSelectedId(null)}
+          reference={selectedCorrespondence?.reference ?? ""}
+          subject={selectedCorrespondence?.subject ?? ""}
+          direction={selectedCorrespondence?.direction}
+          status={selectedCorrespondence?.status}
+          fields={[
+            { label: "Received Date", value: selectedCorrespondence?.receivedDate ?? "" },
+            { label: "Due Date", value: selectedCorrespondence?.dueDate ?? "" },
+            { label: "Branch", value: selectedCorrespondence?.branch ?? "" },
+            { label: "Department", value: selectedCorrespondence?.department ?? "" },
+            { label: "Receptionist", value: selectedCorrespondence?.receptionist ?? "" },
+            { label: "Recipient", value: selectedCorrespondence?.recipient ?? "" },
+            { label: "Action Owner", value: selectedCorrespondence?.actionOwner ?? "" }
+          ]}
+        />
       </Stack>
     </Container>
   );

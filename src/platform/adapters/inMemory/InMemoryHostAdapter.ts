@@ -11,8 +11,10 @@ import { InMemoryBranchRepository } from "./InMemoryBranchRepository";
 import { InMemoryCorrespondenceRepository } from "./InMemoryCorrespondenceRepository";
 import { InMemoryDepartmentRepository } from "./InMemoryDepartmentRepository";
 import { InMemoryNotificationService } from "./InMemoryNotificationService";
+import { InMemoryPostCaptureWorkflowService } from "./InMemoryPostCaptureWorkflowService";
 import { InMemoryReferenceConfigRepository } from "./InMemoryReferenceConfigRepository";
 import { InMemoryUserRepository } from "./InMemoryUserRepository";
+import { InMemoryCorrespondenceAuditLogRepository } from "./InMemoryCorrespondenceAuditLogRepository";
 import { buildPlatformIndicator } from "../../platformIndicator";
 
 export const inMemoryPlatformIndicator = buildPlatformIndicator({
@@ -23,6 +25,9 @@ export const inMemoryPlatformIndicator = buildPlatformIndicator({
 });
 
 export function createInMemoryHostAdapter(): IHostAdapter {
+  const notifications = new InMemoryNotificationService();
+  const correspondenceAuditLog = new InMemoryCorrespondenceAuditLogRepository();
+
   return {
     platform: inMemoryPlatformIndicator,
     correspondences: new InMemoryCorrespondenceRepository(demoCorrespondences),
@@ -30,7 +35,9 @@ export function createInMemoryHostAdapter(): IHostAdapter {
     branches: new InMemoryBranchRepository(demoBranches),
     departments: new InMemoryDepartmentRepository(demoDepartments),
     referenceConfigs: new InMemoryReferenceConfigRepository(demoReferenceConfigs),
-    notifications: new InMemoryNotificationService(),
+    notifications,
+    correspondenceAuditLog,
+    postCaptureWorkflow: new InMemoryPostCaptureWorkflowService(notifications, correspondenceAuditLog),
     sequenceStore: new InMemorySequenceStore()
   };
 }

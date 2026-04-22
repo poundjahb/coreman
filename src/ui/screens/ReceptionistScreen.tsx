@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Alert,
   Badge,
@@ -11,19 +11,20 @@ import {
   Loader,
   Select,
   Stack,
+  Tabs,
   Text,
   TextInput,
   Title
 } from "@mantine/core";
+import { Dropzone } from "@mantine/dropzone";
+import { notifications } from "@mantine/notifications";
+import { UploadCloud, FileText, X } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 import type { CorrespondenceDirection } from "../../domain/correspondence";
-import type { AppUser, Branch, Department } from "../../domain/governance";
-import { filterDepartmentsForBranch } from "../../application/services/branchDepartmentPolicy";
+import type { AppUser, Department } from "../../domain/governance";
 import { registerCorrespondenceInHost } from "../../application/modules/intake/registerCorrespondence";
-import type { IntakeResult } from "../../application/modules/intake/registerCorrespondence";
 import { systemConfig } from "../../config/systemConfig";
 import { runtimeHostAdapter } from "../../platform/runtimeHostAdapter";
-import { DataRow } from "../components/DataRow";
 
 const directionOptions: Array<{ value: CorrespondenceDirection; label: string }> = [
   { value: "INCOMING", label: "Incoming" },
@@ -38,6 +39,19 @@ function getDirectionBadgeColor(direction: CorrespondenceDirection): string {
   return direction === "INCOMING" ? "blue" : "dark";
 }
 
+function resetFormState() {
+  return {
+    subject: "",
+    fromTo: "",
+    organisation: "",
+    correspondenceDate: "",
+    recipientTab: "staff" as "staff" | "department",
+    recipientUserId: null as string | null,
+    recipientDepartmentId: null as string | null,
+    attachedFiles: [] as File[]
+  };
+}
+
 export function ReceptionistScreen(props: { currentUser: AppUser }): JSX.Element {
   const { currentUser } = props;
   const [searchParams] = useSearchParams();
@@ -46,17 +60,18 @@ export function ReceptionistScreen(props: { currentUser: AppUser }): JSX.Element
   const [fromTo, setFromTo] = useState("");
   const [organisation, setOrganisation] = useState("");
   const [correspondenceDate, setCorrespondenceDate] = useState("");
-  const [branchId, setBranchId] = useState<string | null>(currentUser.branchId);
-  const [departmentId, setDepartmentId] = useState<string | null>(currentUser.departmentId);
   const [direction, setDirection] = useState<CorrespondenceDirection>(() =>
     getDirectionFromQuery(searchParams.get("direction"))
   );
-  const [result, setResult] = useState<IntakeResult | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [branches, setBranches] = useState<Branch[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
+  const [users, setUsers] = useState<AppUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [recipientTab, setRecipientTab] = useState<"staff" | "department">("staff");
+  const [recipientUserId, setRecipientUserId] = useState<string | null>(null);
+  const [recipientDepartmentId, setRecipientDepartmentId] = useState<string | null>(null);
+  const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
 
   useEffect(() => {
     let active = true;
@@ -64,72 +79,46 @@ export function ReceptionistScreen(props: { currentUser: AppUser }): JSX.Element
     async function loadFormData(): Promise<void> {
       try {
         setLoading(true);
-        const [loadedBranches, loadedDepartments] = await Promise.all([
-          runtimeHostAdapter.branches.findAll(),
-          runtimeHostAdapter.departments.findAll()
+        const [loadedDepartments, loadedUsers] = await Promise.all([
+          runtimeHostAdapter.departments.findAll(),
+          runtimeHostAdapter.users.findAll()
         ]);
 
-        if (!active) {
-          return;
-        }
+        if (!active) return;
 
-        setBranches(loadedBranches);
         setDepartments(loadedDepartments);
-        setBranchId((current) => current ?? loadedBranches[0]?.id ?? null);
-        setDepartmentId((current) => current ?? loadedDepartments[0]?.id ?? null);
+        setUsers(loadedUsers.filter((u) => u.isActive && u.id !== currentUser.id));
       } catch (loadError) {
-        if (!active) {
-          return;
-        }
-
+        if (!active) return;
         setError(loadError instanceof Error ? loadError.message : "Unable to load registration data.");
       } finally {
-        if (active) {
-          setLoading(false);
-        }
+        if (active) setLoading(false);
       }
     }
 
     void loadFormData();
-
-    return () => {
-      active = false;
-    };
+    return () => { active = false; };
   }, []);
 
   useEffect(() => {
     setDirection(getDirectionFromQuery(searchParams.get("direction")));
   }, [searchParams]);
 
-  const branchOptions = useMemo(
-    () => branches.map((item) => ({ value: item.id, label: `${item.code} - ${item.name}` })),
-    [branches]
-  );
-
-  const allowedDepartments = useMemo(
-    () => filterDepartmentsForBranch(branchId, departments),
-    [branchId, departments]
-  );
-
-  const departmentOptions = useMemo(
-    () => allowedDepartments.map((item) => ({ value: item.id, label: `${item.code} - ${item.name}` })),
-    [allowedDepartments]
-  );
-
-  useEffect(() => {
-    if (!departmentId) {
-      setDepartmentId(allowedDepartments[0]?.id ?? null);
-      return;
-    }
-
-    if (!allowedDepartments.some((item) => item.id === departmentId)) {
-      setDepartmentId(allowedDepartments[0]?.id ?? null);
-    }
-  }, [allowedDepartments, departmentId]);
+  function handleReset(): void {
+    const s = resetFormState();
+    setSubject(s.subject);
+    setFromTo(s.fromTo);
+    setOrganisation(s.organisation);
+    setCorrespondenceDate(s.correspondenceDate);
+    setRecipientTab(s.recipientTab);
+    setRecipientUserId(s.recipientUserId);
+    setRecipientDepartmentId(s.recipientDepartmentId);
+    setAttachedFiles(s.attachedFiles);
+    setError(null);
+  }
 
   async function handleRegister(): Promise<void> {
     setError(null);
-    setResult(null);
 
     if (!subject.trim()) {
       setError("Please enter a subject for the correspondence.");
@@ -141,10 +130,10 @@ export function ReceptionistScreen(props: { currentUser: AppUser }): JSX.Element
       return;
     }
 
-    if (!branchId || !departmentId) {
-      setError("Please select both a branch and a department.");
-      return;
-    }
+    const effectiveDepartmentId =
+      recipientTab === "department" && recipientDepartmentId
+        ? recipientDepartmentId
+        : currentUser.departmentId;
 
     try {
       setSubmitting(true);
@@ -152,17 +141,28 @@ export function ReceptionistScreen(props: { currentUser: AppUser }): JSX.Element
         runtimeHostAdapter,
         currentUser,
         {
-          branchId,
-          departmentId,
+          branchId: currentUser.branchId,
+          departmentId: effectiveDepartmentId,
           subject: subject.trim(),
           direction,
           fromTo: fromTo.trim(),
           organisation: organisation.trim() || undefined,
-          correspondenceDate: correspondenceDate ? new Date(`${correspondenceDate}T00:00:00.000Z`) : undefined
+          correspondenceDate: correspondenceDate
+            ? new Date(`${correspondenceDate}T00:00:00.000Z`)
+            : undefined,
+          recipientId: recipientTab === "staff" ? (recipientUserId ?? undefined) : undefined
         },
         systemConfig.orgCode
       );
-      setResult(intake);
+
+      notifications.show({
+        title: "Correspondence registered",
+        message: `${intake.referenceNumber} — ${intake.subject}`,
+        color: "green",
+        autoClose: 6000
+      });
+
+      handleReset();
     } catch (err) {
       setError(err instanceof Error ? err.message : "An unexpected error occurred.");
     } finally {
@@ -170,29 +170,14 @@ export function ReceptionistScreen(props: { currentUser: AppUser }): JSX.Element
     }
   }
 
-  function handleReset(): void {
-  setSubject("");
-  setFromTo("");
-  setOrganisation("");
-  setCorrespondenceDate("");
-  setBranchId(currentUser.branchId);
-
-    const defaults = filterDepartmentsForBranch(currentUser.branchId, departments);
-    const defaultDepartment = defaults.some((item) => item.id === currentUser.departmentId)
-      ? currentUser.departmentId
-      : defaults[0]?.id ?? null;
-
-    setDepartmentId(defaultDepartment);
-    setResult(null);
-    setError(null);
-  }
-
   return (
     <Container size="md" py="lg">
       <Stack gap="lg">
         <Box>
           <Group gap="sm" align="center" mb={4}>
-            <Title order={2}>Register {direction === "INCOMING" ? "Incoming" : "Outgoing"} Correspondence</Title>
+            <Title order={2}>
+              Register {direction === "INCOMING" ? "Incoming" : "Outgoing"} Correspondence
+            </Title>
             <Badge color={getDirectionBadgeColor(direction)} variant="light" size="lg">
               Receptionist
             </Badge>
@@ -210,6 +195,7 @@ export function ReceptionistScreen(props: { currentUser: AppUser }): JSX.Element
               <Loader size="sm" />
             </Group>
           )}
+
           <Stack gap="md">
             <Title order={4} c="blue.8">
               Correspondence Details
@@ -237,9 +223,7 @@ export function ReceptionistScreen(props: { currentUser: AppUser }): JSX.Element
 
             <TextInput
               label={direction === "INCOMING" ? "From (Sender)" : "To (Recipient)"}
-              placeholder={
-                direction === "INCOMING" ? "e.g. John Doe" : "e.g. Jane Smith"
-              }
+              placeholder={direction === "INCOMING" ? "e.g. John Doe" : "e.g. Jane Smith"}
               value={fromTo}
               onChange={(e) => setFromTo(e.currentTarget.value)}
               required
@@ -254,37 +238,125 @@ export function ReceptionistScreen(props: { currentUser: AppUser }): JSX.Element
               />
               <TextInput
                 label="Correspondence Date"
-                placeholder="YYYY-MM-DD"
                 type="date"
                 value={correspondenceDate}
                 onChange={(e) => setCorrespondenceDate(e.currentTarget.value)}
               />
             </Group>
 
-            <Group grow>
-              <Select
-                label="Branch"
-                data={branchOptions}
-                value={branchId}
-                onChange={setBranchId}
-                required
-                disabled={loading || submitting}
-              />
-              <Select
-                label="Department"
-                data={departmentOptions}
-                value={departmentId}
-                onChange={setDepartmentId}
-                required
-                disabled={loading || submitting}
-              />
-            </Group>
+            {/* ── Recipient ── */}
+            <Box>
+              <Text size="sm" fw={500} mb={6}>
+                Recipient
+              </Text>
+              <Tabs
+                value={recipientTab}
+                onChange={(v) => setRecipientTab((v as "staff" | "department") ?? "staff")}
+              >
+                <Tabs.List>
+                  <Tabs.Tab value="staff">Send directly to a staff</Tabs.Tab>
+                  <Tabs.Tab value="department">Send to a department</Tabs.Tab>
+                </Tabs.List>
+
+                <Tabs.Panel value="staff" pt="sm">
+                  <Select
+                    placeholder="Search and select a staff member…"
+                    data={users.map((u) => ({
+                      value: u.id,
+                      label: `${u.fullName} — ${u.employeeCode}`
+                    }))}
+                    value={recipientUserId}
+                    onChange={setRecipientUserId}
+                    searchable
+                    clearable
+                    disabled={loading || submitting}
+                    nothingFoundMessage="No matching staff found"
+                  />
+                </Tabs.Panel>
+
+                <Tabs.Panel value="department" pt="sm">
+                  <Select
+                    placeholder="Select a department…"
+                    data={departments
+                      .filter((d) => d.isActive)
+                      .map((d) => ({ value: d.id, label: `${d.code} — ${d.name}` }))}
+                    value={recipientDepartmentId}
+                    onChange={setRecipientDepartmentId}
+                    disabled={loading || submitting}
+                  />
+                </Tabs.Panel>
+              </Tabs>
+            </Box>
+
+            {/* ── Attachments ── */}
+            <Box>
+              <Text size="sm" fw={500} mb={6}>
+                Attachments
+              </Text>
+              <Dropzone
+                onDrop={(files) => setAttachedFiles((prev) => [...prev, ...files])}
+                accept={["application/pdf", "image/png", "image/jpeg", "image/tiff"]}
+                disabled={submitting}
+                radius="md"
+              >
+                <Group justify="center" gap="xl" mih={80} style={{ pointerEvents: "none" }}>
+                  <Dropzone.Accept>
+                    <UploadCloud size={32} color="var(--mantine-color-blue-6)" />
+                  </Dropzone.Accept>
+                  <Dropzone.Reject>
+                    <X size={32} color="var(--mantine-color-red-6)" />
+                  </Dropzone.Reject>
+                  <Dropzone.Idle>
+                    <UploadCloud size={32} color="var(--mantine-color-dimmed)" />
+                  </Dropzone.Idle>
+                  <Box>
+                    <Text size="sm" fw={500}>
+                      Drop files here or click to browse
+                    </Text>
+                    <Text size="xs" c="dimmed">
+                      PDF, PNG, JPEG, TIFF
+                    </Text>
+                  </Box>
+                </Group>
+              </Dropzone>
+
+              {attachedFiles.length > 0 && (
+                <Stack gap={4} mt="xs">
+                  {attachedFiles.map((file, idx) => (
+                    <Group key={idx} gap="xs" justify="space-between">
+                      <Group gap={6}>
+                        <FileText size={14} />
+                        <Text size="sm">{file.name}</Text>
+                        <Text size="xs" c="dimmed">
+                          ({(file.size / 1024).toFixed(1)} KB)
+                        </Text>
+                      </Group>
+                      <Button
+                        variant="subtle"
+                        color="red"
+                        size="compact-xs"
+                        onClick={() =>
+                          setAttachedFiles((prev) => prev.filter((_, i) => i !== idx))
+                        }
+                      >
+                        Remove
+                      </Button>
+                    </Group>
+                  ))}
+                </Stack>
+              )}
+            </Box>
 
             <Group justify="flex-end" mt="xs">
               <Button variant="default" onClick={handleReset} disabled={submitting}>
                 Clear
               </Button>
-              <Button onClick={() => void handleRegister()} color="blue" loading={submitting} disabled={loading}>
+              <Button
+                onClick={() => void handleRegister()}
+                color="blue"
+                loading={submitting}
+                disabled={loading}
+              >
                 Register Correspondence
               </Button>
             </Group>
@@ -295,31 +367,6 @@ export function ReceptionistScreen(props: { currentUser: AppUser }): JSX.Element
           <Alert color="red" title="Validation Error" radius="md">
             {error}
           </Alert>
-        )}
-
-        {result && (
-          <Card withBorder radius="md" p="xl" bd="1px solid green.4">
-            <Stack gap="xs">
-              <Group gap="xs" mb={4}>
-                <Title order={4} c="green.8">
-                  Correspondence Registered
-                </Title>
-                <Badge color="green" size="sm">
-                  Success
-                </Badge>
-              </Group>
-
-              <DataRow label="Reference Number" value={result.referenceNumber} />
-              <DataRow label="Subject" value={result.subject} />
-              <DataRow label="Recorded By" value={result.createdBy} />
-
-              <Group justify="flex-end" mt="xs">
-                <Button variant="light" color="blue" onClick={handleReset}>
-                  Register Another
-                </Button>
-              </Group>
-            </Stack>
-          </Card>
         )}
       </Stack>
     </Container>

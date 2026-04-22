@@ -5,6 +5,8 @@ import type { IBranchRepository } from "../../contracts/IBranchRepository";
 import type { IDepartmentRepository } from "../../contracts/IDepartmentRepository";
 import type { IReferenceConfigRepository } from "../../contracts/IReferenceConfigRepository";
 import type { INotificationService, NotificationPayload } from "../../contracts/INotificationService";
+import type { ICorrespondenceAuditLogRepository } from "../../contracts/ICorrespondenceAuditLogRepository";
+import type { IPostCaptureWorkflowService } from "../../contracts/IPostCaptureWorkflowService";
 import type { SequenceStore } from "../../../domain/reference";
 import { buildPlatformIndicator } from "../../platformIndicator";
 
@@ -62,6 +64,15 @@ const dataverseSequenceStore: SequenceStore = {
   next: (_key: string) => notImplemented("sequenceStore.next")
 };
 
+const dataverseAuditLog: ICorrespondenceAuditLogRepository = {
+  append: () => notImplemented("correspondenceAuditLog.append"),
+  findByCorrespondence: () => notImplemented("correspondenceAuditLog.findByCorrespondence")
+};
+
+const dataversePostCaptureWorkflow: IPostCaptureWorkflowService = {
+  execute: () => notImplemented("postCaptureWorkflow.execute")
+};
+
 export const dataverseHostAdapter: IHostAdapter = {
   platform: dataversePlatformIndicator,
   correspondences: dataverseCorrespondenceRepository,
@@ -70,5 +81,7 @@ export const dataverseHostAdapter: IHostAdapter = {
   departments: dataverseDepartmentRepository,
   referenceConfigs: dataverseReferenceConfigRepository,
   notifications: dataverseNotificationService,
+  correspondenceAuditLog: dataverseAuditLog,
+  postCaptureWorkflow: dataversePostCaptureWorkflow,
   sequenceStore: dataverseSequenceStore
 };
