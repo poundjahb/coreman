@@ -1,4 +1,5 @@
 import type { IHostAdapter } from "../../IHostAdapter";
+import { getRuntimeSmtpConfig, type SmtpConfig } from "../../../config/systemConfig";
 import { openDatabase } from "./SqliteDatabase";
 import { SqliteCorrespondenceRepository } from "./SqliteCorrespondenceRepository";
 import { SqliteUserRepository } from "./SqliteUserRepository";
@@ -8,21 +9,9 @@ import { SqliteReferenceConfigRepository } from "./SqliteReferenceConfigReposito
 import { SqliteNotificationService } from "./SqliteNotificationService";
 import { SqliteSequenceStore } from "./SqliteSequenceStore";
 import { buildPlatformIndicator } from "../../platformIndicator";
-import type { ICorrespondenceAuditLogRepository } from "../../contracts/ICorrespondenceAuditLogRepository";
-import type { IPostCaptureWorkflowService } from "../../contracts/IPostCaptureWorkflowService";
-
-const pendingCorrespondenceAuditLog: ICorrespondenceAuditLogRepository = {
-  append: async () => {
-    throw new Error("Sqlite correspondence audit log is not implemented yet.");
-  },
-  findByCorrespondence: async () => []
-};
-
-const pendingPostCaptureWorkflow: IPostCaptureWorkflowService = {
-  execute: async () => {
-    throw new Error("Sqlite post-capture workflow is not implemented yet.");
-  }
-};
+import { SqliteCorrespondenceAuditLogRepository } from "./SqliteCorrespondenceAuditLogRepository";
+import { SqlitePostCaptureWorkflowService } from "./SqlitePostCaptureWorkflowService";
+import { SqliteSmtpSettingsService } from "./SqliteSmtpSettingsService";
 
 export const sqliteMainProcessPlatformIndicator = buildPlatformIndicator({
   target: "SQLITE",
@@ -31,12 +20,23 @@ export const sqliteMainProcessPlatformIndicator = buildPlatformIndicator({
   backgroundColor: "#5742d6"
 });
 
+export interface CreateSqliteHostAdapterOptions {
+  smtpConfig?: SmtpConfig;
+}
+
 /**
  * Creates a fully wired SQLite host adapter.
  * Call this from the Electron main process, passing the path to the .db file.
  */
-export function createSqliteHostAdapter(dbPath: string): IHostAdapter {
+export function createSqliteHostAdapter(
+  dbPath: string,
+  options: CreateSqliteHostAdapterOptions = {}
+): IHostAdapter {
   const db = openDatabase(dbPath);
+  const smtpSettings = new SqliteSmtpSettingsService(db, options.smtpConfig ?? getRuntimeSmtpConfig());
+  const notifications = new SqliteNotificationService(db, smtpSettings);
+  const correspondenceAuditLog = new SqliteCorrespondenceAuditLogRepository(db);
+
   return {
     platform: sqliteMainProcessPlatformIndicator,
     correspondences: new SqliteCorrespondenceRepository(db),
@@ -44,9 +44,10 @@ export function createSqliteHostAdapter(dbPath: string): IHostAdapter {
     branches: new SqliteBranchRepository(db),
     departments: new SqliteDepartmentRepository(db),
     referenceConfigs: new SqliteReferenceConfigRepository(db),
-    notifications: new SqliteNotificationService(db),
-    correspondenceAuditLog: pendingCorrespondenceAuditLog,
-    postCaptureWorkflow: pendingPostCaptureWorkflow,
+    smtpSettings,
+    notifications,
+    correspondenceAuditLog,
+    postCaptureWorkflow: new SqlitePostCaptureWorkflowService(notifications, correspondenceAuditLog),
     sequenceStore: new SqliteSequenceStore(db)
   };
 }
@@ -88,6 +89,11 @@ export const sqliteHostAdapter: IHostAdapter = (() => {
       delete: () => notReady("delete")
     },
     referenceConfigs: { findAll: () => notReady("findAll"), findActive: () => notReady("findActive") },
+    smtpSettings: {
+      getConfig: () => notReady("smtpSettings.getConfig"),
+      saveConfig: () => notReady("smtpSettings.saveConfig"),
+      sendTestEmail: () => notReady("smtpSettings.sendTestEmail")
+    },
     notifications: { send: () => notReady("send") },
     correspondenceAuditLog: {
       append: () => notReady("append"),

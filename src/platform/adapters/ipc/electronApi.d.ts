@@ -7,6 +7,8 @@ import type {
 } from "../../contracts/ICorrespondenceAuditLogRepository";
 import type { NotificationPayload } from "../../contracts/INotificationService";
 import type { ExecutePostCaptureWorkflowCommand } from "../../contracts/IPostCaptureWorkflowService";
+import type { SendTestEmailCommand } from "../../contracts/ISmtpSettingsService";
+import type { SmtpConfig } from "../../../config/systemConfig";
 
 /**
  * Shape of window.electronAPI injected by electron/preload.ts via contextBridge.
@@ -42,6 +44,11 @@ export interface ElectronAPI {
   referenceConfigs: {
     findAll(): Promise<ReferenceFormatConfig[]>;
     findActive(): Promise<ReferenceFormatConfig[]>;
+  };
+  smtpSettings: {
+    getConfig(): Promise<SmtpConfig>;
+    saveConfig(config: SmtpConfig): Promise<void>;
+    sendTestEmail(command: SendTestEmailCommand): Promise<void>;
   };
   notifications: {
     send(payload: NotificationPayload): Promise<void>;

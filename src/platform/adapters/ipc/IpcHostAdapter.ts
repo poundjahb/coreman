@@ -50,6 +50,11 @@ export function createIpcHostAdapter(): IHostAdapter {
       findAll: () => api.referenceConfigs.findAll(),
       findActive: () => api.referenceConfigs.findActive()
     },
+    smtpSettings: {
+      getConfig: () => api.smtpSettings.getConfig(),
+      saveConfig: (config) => api.smtpSettings.saveConfig(config),
+      sendTestEmail: (command) => api.smtpSettings.sendTestEmail(command)
+    },
     notifications: {
       send: (payload) => api.notifications.send(payload)
     },

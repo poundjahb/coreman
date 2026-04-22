@@ -1,9 +1,14 @@
 import { randomUUID } from "crypto";
 import type { Database } from "better-sqlite3";
 import type { INotificationService, NotificationPayload } from "../../contracts/INotificationService";
+import type { ISmtpSettingsService } from "../../contracts/ISmtpSettingsService";
+import { NodemailerSqliteMailer } from "./SqliteMailer";
 
 export class SqliteNotificationService implements INotificationService {
-  constructor(private readonly db: Database) {}
+  constructor(
+    private readonly db: Database,
+    private readonly smtpSettingsService: ISmtpSettingsService
+  ) {}
 
   async send(payload: NotificationPayload): Promise<void> {
     this.db
@@ -19,5 +24,23 @@ export class SqliteNotificationService implements INotificationService {
         correspondenceId: payload.correspondenceId ?? null,
         sentAt: new Date().toISOString()
       });
+
+    const row = this.db.prepare("SELECT email FROM users WHERE id = ?").get(payload.recipientId) as
+      | { email: string }
+      | undefined;
+    const recipientEmail = row?.email;
+
+    if (!recipientEmail) {
+      return;
+    }
+
+    const config = await this.smtpSettingsService.getConfig();
+    const mailer = new NodemailerSqliteMailer(config);
+
+    await mailer.send({
+      to: recipientEmail,
+      subject: payload.subject,
+      text: payload.body
+    });
   }
 }

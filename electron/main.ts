@@ -7,6 +7,8 @@ import type { AppUser, Branch, Department } from "../src/domain/governance";
 import type { CreateCorrespondenceAuditEvent } from "../src/platform/contracts/ICorrespondenceAuditLogRepository";
 import type { NotificationPayload } from "../src/platform/contracts/INotificationService";
 import type { ExecutePostCaptureWorkflowCommand } from "../src/platform/contracts/IPostCaptureWorkflowService";
+import type { SendTestEmailCommand } from "../src/platform/contracts/ISmtpSettingsService";
+import type { SmtpConfig } from "../src/config/systemConfig";
 
 let adapter: IHostAdapter;
 
@@ -76,6 +78,15 @@ function registerIpcHandlers(): void {
   // notifications
   ipcMain.handle("notifications:send", (_e, payload: NotificationPayload) =>
     adapter.notifications.send(payload)
+  );
+
+  // smtpSettings
+  ipcMain.handle("smtpSettings:getConfig", (): Promise<SmtpConfig> => adapter.smtpSettings.getConfig());
+  ipcMain.handle("smtpSettings:saveConfig", (_e, config: SmtpConfig) =>
+    adapter.smtpSettings.saveConfig(config)
+  );
+  ipcMain.handle("smtpSettings:sendTestEmail", (_e, command: SendTestEmailCommand) =>
+    adapter.smtpSettings.sendTestEmail(command)
   );
 
   // correspondenceAuditLog

@@ -6,6 +6,8 @@ import type {
 } from "../src/platform/contracts/ICorrespondenceAuditLogRepository";
 import type { NotificationPayload } from "../src/platform/contracts/INotificationService";
 import type { ExecutePostCaptureWorkflowCommand } from "../src/platform/contracts/IPostCaptureWorkflowService";
+import type { SendTestEmailCommand } from "../src/platform/contracts/ISmtpSettingsService";
+import type { SmtpConfig } from "../src/config/systemConfig";
 
 contextBridge.exposeInMainWorld("electronAPI", {
   correspondences: {
@@ -39,6 +41,11 @@ contextBridge.exposeInMainWorld("electronAPI", {
   referenceConfigs: {
     findAll: () => ipcRenderer.invoke("referenceConfigs:findAll"),
     findActive: () => ipcRenderer.invoke("referenceConfigs:findActive")
+  },
+  smtpSettings: {
+    getConfig: (): Promise<SmtpConfig> => ipcRenderer.invoke("smtpSettings:getConfig"),
+    saveConfig: (config: SmtpConfig) => ipcRenderer.invoke("smtpSettings:saveConfig", config),
+    sendTestEmail: (command: SendTestEmailCommand) => ipcRenderer.invoke("smtpSettings:sendTestEmail", command)
   },
   notifications: {
     send: (payload: NotificationPayload) => ipcRenderer.invoke("notifications:send", payload)

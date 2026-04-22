@@ -7,6 +7,7 @@ import type { IReferenceConfigRepository } from "../../contracts/IReferenceConfi
 import type { INotificationService, NotificationPayload } from "../../contracts/INotificationService";
 import type { ICorrespondenceAuditLogRepository } from "../../contracts/ICorrespondenceAuditLogRepository";
 import type { IPostCaptureWorkflowService } from "../../contracts/IPostCaptureWorkflowService";
+import type { ISmtpSettingsService } from "../../contracts/ISmtpSettingsService";
 import type { SequenceStore } from "../../../domain/reference";
 import { buildPlatformIndicator } from "../../platformIndicator";
 
@@ -73,6 +74,12 @@ const dataversePostCaptureWorkflow: IPostCaptureWorkflowService = {
   execute: () => notImplemented("postCaptureWorkflow.execute")
 };
 
+const dataverseSmtpSettings: ISmtpSettingsService = {
+  getConfig: () => notImplemented("smtpSettings.getConfig"),
+  saveConfig: () => notImplemented("smtpSettings.saveConfig"),
+  sendTestEmail: () => notImplemented("smtpSettings.sendTestEmail")
+};
+
 export const dataverseHostAdapter: IHostAdapter = {
   platform: dataversePlatformIndicator,
   correspondences: dataverseCorrespondenceRepository,
@@ -80,6 +87,7 @@ export const dataverseHostAdapter: IHostAdapter = {
   branches: dataverseBranchRepository,
   departments: dataverseDepartmentRepository,
   referenceConfigs: dataverseReferenceConfigRepository,
+  smtpSettings: dataverseSmtpSettings,
   notifications: dataverseNotificationService,
   correspondenceAuditLog: dataverseAuditLog,
   postCaptureWorkflow: dataversePostCaptureWorkflow,

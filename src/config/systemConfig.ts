@@ -11,6 +11,16 @@ export interface WorkflowConfig {
   mode: WorkflowMode;
 }
 
+export interface SmtpConfig {
+  host: string;
+  port: number;
+  secure: boolean;
+  user?: string;
+  pass?: string;
+  fromAddress: string;
+  connectionTimeoutMs: number;
+}
+
 export const systemConfig: SystemConfig = {
   authMode: "APP",
   orgCode: "BANK"
@@ -48,4 +58,65 @@ export function getRuntimeWorkflowMode(): WorkflowMode {
   }
 
   return workflowConfig.mode;
+}
+
+function readEnvValue(key: string): string | undefined {
+  if (typeof process !== "undefined") {
+    const processValue = process.env?.[key];
+    if (typeof processValue === "string" && processValue.length > 0) {
+      return processValue;
+    }
+  }
+
+  if (typeof import.meta !== "undefined") {
+    const env = (import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env;
+    const viteValue = env?.[`VITE_${key}`];
+    if (typeof viteValue === "string" && viteValue.length > 0) {
+      return viteValue;
+    }
+  }
+
+  return undefined;
+}
+
+function parsePort(rawValue: string | undefined, fallback: number): number {
+  if (!rawValue) {
+    return fallback;
+  }
+
+  const parsed = Number.parseInt(rawValue, 10);
+  if (Number.isNaN(parsed) || parsed <= 0) {
+    return fallback;
+  }
+
+  return parsed;
+}
+
+function parseBoolean(rawValue: string | undefined, fallback: boolean): boolean {
+  if (!rawValue) {
+    return fallback;
+  }
+
+  const normalized = rawValue.trim().toLowerCase();
+  if (normalized === "true" || normalized === "1" || normalized === "yes") {
+    return true;
+  }
+
+  if (normalized === "false" || normalized === "0" || normalized === "no") {
+    return false;
+  }
+
+  return fallback;
+}
+
+export function getRuntimeSmtpConfig(): SmtpConfig {
+  return {
+    host: readEnvValue("SMTP_HOST") ?? "127.0.0.1",
+    port: parsePort(readEnvValue("SMTP_PORT"), 1025),
+    secure: parseBoolean(readEnvValue("SMTP_SECURE"), false),
+    user: readEnvValue("SMTP_USER"),
+    pass: readEnvValue("SMTP_PASS"),
+    fromAddress: readEnvValue("SMTP_FROM") ?? "noreply@bank.local",
+    connectionTimeoutMs: parsePort(readEnvValue("SMTP_CONNECTION_TIMEOUT_MS"), 3000)
+  };
 }

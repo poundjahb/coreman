@@ -7,6 +7,7 @@ import type { ICorrespondenceAuditLogRepository } from "./contracts/ICorresponde
 import type { INotificationService } from "./contracts/INotificationService";
 import type { IPostCaptureWorkflowService } from "./contracts/IPostCaptureWorkflowService";
 import type { IReferenceConfigRepository } from "./contracts/IReferenceConfigRepository";
+import type { ISmtpSettingsService } from "./contracts/ISmtpSettingsService";
 import type { IUserRepository } from "./contracts/IUserRepository";
 
 export interface PlatformIndicator {
@@ -22,6 +23,7 @@ export interface IHostAdapter {
   branches: IBranchRepository;
   departments: IDepartmentRepository;
   referenceConfigs: IReferenceConfigRepository;
+  smtpSettings: ISmtpSettingsService;
   notifications: INotificationService;
   correspondenceAuditLog: ICorrespondenceAuditLogRepository;
   postCaptureWorkflow: IPostCaptureWorkflowService;

@@ -92,6 +92,29 @@ function initSchema(db: Database): void {
       correspondenceId TEXT,
       sentAt           TEXT NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS correspondence_audit_log (
+      id               TEXT PRIMARY KEY,
+      correspondenceId TEXT NOT NULL,
+      eventType        TEXT NOT NULL,
+      status           TEXT NOT NULL,
+      payloadJson      TEXT,
+      errorMessage     TEXT,
+      createdAt        TEXT NOT NULL,
+      createdById      TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS smtp_settings (
+      id                  INTEGER PRIMARY KEY CHECK (id = 1),
+      host                TEXT NOT NULL,
+      port                INTEGER NOT NULL,
+      secure              INTEGER NOT NULL,
+      user                TEXT,
+      pass                TEXT,
+      fromAddress         TEXT NOT NULL,
+      connectionTimeoutMs INTEGER NOT NULL,
+      updatedAt           TEXT NOT NULL
+    );
   `);
 
   ensureCorrespondenceColumns(db);
