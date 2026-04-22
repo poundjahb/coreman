@@ -43,6 +43,9 @@ export function ReceptionistScreen(props: { currentUser: AppUser }): JSX.Element
   const [searchParams] = useSearchParams();
 
   const [subject, setSubject] = useState("");
+  const [fromTo, setFromTo] = useState("");
+  const [organisation, setOrganisation] = useState("");
+  const [correspondenceDate, setCorrespondenceDate] = useState("");
   const [branchId, setBranchId] = useState<string | null>(currentUser.branchId);
   const [departmentId, setDepartmentId] = useState<string | null>(currentUser.departmentId);
   const [direction, setDirection] = useState<CorrespondenceDirection>(() =>
@@ -133,6 +136,11 @@ export function ReceptionistScreen(props: { currentUser: AppUser }): JSX.Element
       return;
     }
 
+    if (!fromTo.trim()) {
+      setError(direction === "INCOMING" ? "Please enter the sender name." : "Please enter the recipient name.");
+      return;
+    }
+
     if (!branchId || !departmentId) {
       setError("Please select both a branch and a department.");
       return;
@@ -147,7 +155,10 @@ export function ReceptionistScreen(props: { currentUser: AppUser }): JSX.Element
           branchId,
           departmentId,
           subject: subject.trim(),
-          direction
+          direction,
+          fromTo: fromTo.trim(),
+          organisation: organisation.trim() || undefined,
+          correspondenceDate: correspondenceDate ? new Date(`${correspondenceDate}T00:00:00.000Z`) : undefined
         },
         systemConfig.orgCode
       );
@@ -160,8 +171,11 @@ export function ReceptionistScreen(props: { currentUser: AppUser }): JSX.Element
   }
 
   function handleReset(): void {
-    setSubject("");
-    setBranchId(currentUser.branchId);
+  setSubject("");
+  setFromTo("");
+  setOrganisation("");
+  setCorrespondenceDate("");
+  setBranchId(currentUser.branchId);
 
     const defaults = filterDepartmentsForBranch(currentUser.branchId, departments);
     const defaultDepartment = defaults.some((item) => item.id === currentUser.departmentId)
@@ -220,6 +234,32 @@ export function ReceptionistScreen(props: { currentUser: AppUser }): JSX.Element
               onChange={(e) => setSubject(e.currentTarget.value)}
               required
             />
+
+            <TextInput
+              label={direction === "INCOMING" ? "From (Sender)" : "To (Recipient)"}
+              placeholder={
+                direction === "INCOMING" ? "e.g. John Doe" : "e.g. Jane Smith"
+              }
+              value={fromTo}
+              onChange={(e) => setFromTo(e.currentTarget.value)}
+              required
+            />
+
+            <Group grow>
+              <TextInput
+                label="Organisation"
+                placeholder="e.g. Central Bank"
+                value={organisation}
+                onChange={(e) => setOrganisation(e.currentTarget.value)}
+              />
+              <TextInput
+                label="Correspondence Date"
+                placeholder="YYYY-MM-DD"
+                type="date"
+                value={correspondenceDate}
+                onChange={(e) => setCorrespondenceDate(e.currentTarget.value)}
+              />
+            </Group>
 
             <Group grow>
               <Select

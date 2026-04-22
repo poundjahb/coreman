@@ -24,6 +24,9 @@ function initSchema(db: Database): void {
       reference       TEXT NOT NULL,
       subject         TEXT NOT NULL,
       direction       TEXT NOT NULL,
+      fromTo          TEXT NOT NULL,
+      organisation    TEXT,
+      correspondenceDate TEXT,
       branchId        TEXT NOT NULL,
       departmentId    TEXT,
       registeredById  TEXT NOT NULL,
@@ -33,7 +36,10 @@ function initSchema(db: Database): void {
       receivedDate    TEXT NOT NULL,
       dueDate         TEXT,
       createdAt       TEXT NOT NULL,
-      updatedAt       TEXT NOT NULL
+      updatedAt       TEXT NOT NULL,
+      createById      TEXT,
+      updateById      TEXT,
+      summary         TEXT CHECK (summary IS NULL OR length(summary) <= 500)
     );
 
     CREATE TABLE IF NOT EXISTS users (
@@ -86,6 +92,140 @@ function initSchema(db: Database): void {
       correspondenceId TEXT,
       sentAt           TEXT NOT NULL
     );
+  `);
+
+  ensureCorrespondenceColumns(db);
+  ensureCorrespondenceUserReferenceTriggers(db);
+}
+
+function ensureCorrespondenceColumns(db: Database): void {
+  const columns = db.prepare("PRAGMA table_info(correspondences)").all() as Array<{ name: string }>;
+  const existing = new Set(columns.map((column) => column.name));
+
+  if (!existing.has("fromTo")) {
+    db.exec(`ALTER TABLE correspondences ADD COLUMN fromTo TEXT NOT NULL DEFAULT ''`);
+  }
+
+  if (!existing.has("organisation")) {
+    db.exec(`ALTER TABLE correspondences ADD COLUMN organisation TEXT`);
+  }
+
+  if (!existing.has("correspondenceDate")) {
+    db.exec(`ALTER TABLE correspondences ADD COLUMN correspondenceDate TEXT`);
+  }
+
+  if (!existing.has("createById")) {
+    db.exec(`ALTER TABLE correspondences ADD COLUMN createById TEXT`);
+    db.exec(`UPDATE correspondences SET createById = registeredById WHERE createById IS NULL OR createById = ''`);
+  }
+
+  if (!existing.has("updateById")) {
+    db.exec(`ALTER TABLE correspondences ADD COLUMN updateById TEXT`);
+    db.exec(`UPDATE correspondences SET updateById = registeredById WHERE updateById IS NULL OR updateById = ''`);
+  }
+
+  if (!existing.has("summary")) {
+    db.exec(`ALTER TABLE correspondences ADD COLUMN summary TEXT`);
+  }
+}
+
+function ensureCorrespondenceUserReferenceTriggers(db: Database): void {
+  db.exec(`
+    CREATE TRIGGER IF NOT EXISTS correspondences_registered_by_fk_insert
+    BEFORE INSERT ON correspondences
+    FOR EACH ROW
+    WHEN (SELECT id FROM users WHERE id = NEW.registeredById) IS NULL
+    BEGIN
+      SELECT RAISE(ABORT, 'registeredById must reference users.id');
+    END;
+
+    CREATE TRIGGER IF NOT EXISTS correspondences_registered_by_fk_update
+    BEFORE UPDATE OF registeredById ON correspondences
+    FOR EACH ROW
+    WHEN (SELECT id FROM users WHERE id = NEW.registeredById) IS NULL
+    BEGIN
+      SELECT RAISE(ABORT, 'registeredById must reference users.id');
+    END;
+
+    CREATE TRIGGER IF NOT EXISTS correspondences_recipient_fk_insert
+    BEFORE INSERT ON correspondences
+    FOR EACH ROW
+    WHEN NEW.recipientId IS NOT NULL AND (SELECT id FROM users WHERE id = NEW.recipientId) IS NULL
+    BEGIN
+      SELECT RAISE(ABORT, 'recipientId must reference users.id');
+    END;
+
+    CREATE TRIGGER IF NOT EXISTS correspondences_recipient_fk_update
+    BEFORE UPDATE OF recipientId ON correspondences
+    FOR EACH ROW
+    WHEN NEW.recipientId IS NOT NULL AND (SELECT id FROM users WHERE id = NEW.recipientId) IS NULL
+    BEGIN
+      SELECT RAISE(ABORT, 'recipientId must reference users.id');
+    END;
+
+    CREATE TRIGGER IF NOT EXISTS correspondences_action_owner_fk_insert
+    BEFORE INSERT ON correspondences
+    FOR EACH ROW
+    WHEN NEW.actionOwnerId IS NOT NULL AND (SELECT id FROM users WHERE id = NEW.actionOwnerId) IS NULL
+    BEGIN
+      SELECT RAISE(ABORT, 'actionOwnerId must reference users.id');
+    END;
+
+    CREATE TRIGGER IF NOT EXISTS correspondences_action_owner_fk_update
+    BEFORE UPDATE OF actionOwnerId ON correspondences
+    FOR EACH ROW
+    WHEN NEW.actionOwnerId IS NOT NULL AND (SELECT id FROM users WHERE id = NEW.actionOwnerId) IS NULL
+    BEGIN
+      SELECT RAISE(ABORT, 'actionOwnerId must reference users.id');
+    END;
+
+    CREATE TRIGGER IF NOT EXISTS correspondences_create_by_fk_insert
+    BEFORE INSERT ON correspondences
+    FOR EACH ROW
+    WHEN NEW.createById IS NULL OR NEW.createById = '' OR (SELECT id FROM users WHERE id = NEW.createById) IS NULL
+    BEGIN
+      SELECT RAISE(ABORT, 'createById must reference users.id');
+    END;
+
+    CREATE TRIGGER IF NOT EXISTS correspondences_create_by_fk_update
+    BEFORE UPDATE OF createById ON correspondences
+    FOR EACH ROW
+    WHEN NEW.createById IS NOT NULL AND NEW.createById != '' AND (SELECT id FROM users WHERE id = NEW.createById) IS NULL
+    BEGIN
+      SELECT RAISE(ABORT, 'createById must reference users.id');
+    END;
+
+    CREATE TRIGGER IF NOT EXISTS correspondences_update_by_fk_insert
+    BEFORE INSERT ON correspondences
+    FOR EACH ROW
+    WHEN NEW.updateById IS NULL OR NEW.updateById = '' OR (SELECT id FROM users WHERE id = NEW.updateById) IS NULL
+    BEGIN
+      SELECT RAISE(ABORT, 'updateById must reference users.id');
+    END;
+
+    CREATE TRIGGER IF NOT EXISTS correspondences_update_by_fk_update
+    BEFORE UPDATE OF updateById ON correspondences
+    FOR EACH ROW
+    WHEN NEW.updateById IS NOT NULL AND NEW.updateById != '' AND (SELECT id FROM users WHERE id = NEW.updateById) IS NULL
+    BEGIN
+      SELECT RAISE(ABORT, 'updateById must reference users.id');
+    END;
+
+    CREATE TRIGGER IF NOT EXISTS correspondences_summary_len_insert
+    BEFORE INSERT ON correspondences
+    FOR EACH ROW
+    WHEN NEW.summary IS NOT NULL AND length(NEW.summary) > 500
+    BEGIN
+      SELECT RAISE(ABORT, 'summary length must be <= 500');
+    END;
+
+    CREATE TRIGGER IF NOT EXISTS correspondences_summary_len_update
+    BEFORE UPDATE OF summary ON correspondences
+    FOR EACH ROW
+    WHEN NEW.summary IS NOT NULL AND length(NEW.summary) > 500
+    BEGIN
+      SELECT RAISE(ABORT, 'summary length must be <= 500');
+    END;
   `);
 }
 
@@ -153,19 +293,31 @@ function seedDatabase(db: Database): void {
   if (!hasRows(db, "correspondences")) {
     const insertCorrespondence = db.prepare(
       `INSERT INTO correspondences
-        (id, reference, subject, direction, branchId, departmentId, registeredById,
-         recipientId, actionOwnerId, status, receivedDate, dueDate, createdAt, updatedAt)
+        (id, reference, subject, direction, fromTo, organisation, correspondenceDate, branchId,
+         departmentId, registeredById, recipientId, actionOwnerId, status, receivedDate,
+         dueDate, createdAt, updatedAt, createById, updateById, summary)
        VALUES
-        (@id, @reference, @subject, @direction, @branchId, @departmentId, @registeredById,
-         @recipientId, @actionOwnerId, @status, @receivedDate, @dueDate, @createdAt, @updatedAt)`
+        (@id, @reference, @subject, @direction, @fromTo, @organisation, @correspondenceDate,
+         @branchId, @departmentId, @registeredById, @recipientId, @actionOwnerId, @status,
+         @receivedDate, @dueDate, @createdAt, @updatedAt, @createById, @updateById, @summary)`
     );
     for (const correspondence of demoCorrespondences) {
       insertCorrespondence.run({
         ...correspondence,
+        organisation: correspondence.organisation ?? null,
+        correspondenceDate: correspondence.correspondenceDate
+          ? correspondence.correspondenceDate.toISOString()
+          : null,
+        receivedDate: correspondence.receivedDate.toISOString(),
+        dueDate: correspondence.dueDate ? correspondence.dueDate.toISOString() : null,
+        createdAt: correspondence.createdAt.toISOString(),
         departmentId: correspondence.departmentId ?? null,
         recipientId: correspondence.recipientId ?? null,
         actionOwnerId: correspondence.actionOwnerId ?? null,
-        dueDate: correspondence.dueDate ?? null
+        updatedAt: correspondence.updatedAt.toISOString(),
+        createById: correspondence.createBy.id,
+        updateById: correspondence.updateBy.id,
+        summary: correspondence.summary ?? null
       });
     }
   }

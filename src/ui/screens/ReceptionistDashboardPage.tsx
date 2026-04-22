@@ -45,6 +45,14 @@ function formatStatus(status: Correspondence["status"]): string {
     .join(" ");
 }
 
+function formatDate(value: Date | undefined): string {
+  if (!value) {
+    return "-";
+  }
+
+  return value.toISOString().slice(0, 10);
+}
+
 export function ReceptionistDashboardPage(props: { currentUser: AppUser }): JSX.Element {
   const { currentUser } = props;
   const [direction, setDirection] = useState<string | null>("all");
@@ -107,7 +115,7 @@ export function ReceptionistDashboardPage(props: { currentUser: AppUser }): JSX.
     const departmentById = new Map(departments.map((item) => [item.id, item]));
 
     return [...records]
-      .sort((left, right) => right.receivedDate.localeCompare(left.receivedDate))
+      .sort((left, right) => right.receivedDate.getTime() - left.receivedDate.getTime())
       .filter((item) => (direction === "all" ? true : item.direction === direction))
       .filter((item) => (status === "all" ? true : item.status === status))
       .filter((item) => {
@@ -196,7 +204,7 @@ export function ReceptionistDashboardPage(props: { currentUser: AppUser }): JSX.
                     <Table.Td>
                       <Badge variant="light">{formatStatus(row.status)}</Badge>
                     </Table.Td>
-                    <Table.Td>{row.dueDate ?? "-"}</Table.Td>
+                    <Table.Td>{formatDate(row.dueDate)}</Table.Td>
                   </Table.Tr>
                 ))}
               </Table.Tbody>

@@ -108,53 +108,71 @@ export const demoReferenceConfigs: ReferenceFormatConfig[] = [
   }
 ];
 
+const seededByReceptionist = demoUsers.find((user) => user.id === "u-001");
+if (!seededByReceptionist) {
+  throw new Error("Seed user u-001 is required for correspondence audit fields.");
+}
+
 export const demoCorrespondences: Correspondence[] = [
   {
     id: "c-001",
     reference: "BANK-HQ-OPS-202604-000001",
     subject: "Regulatory request for Q1 compliance returns",
     direction: "INCOMING",
+    fromTo: "Central Bank Regulatory Authority",
+    organisation: "Central Bank",
+    correspondenceDate: new Date("2026-04-19T00:00:00.000Z"),
     branchId: "b-001",
     departmentId: "d-001",
     registeredById: "u-001",
     recipientId: "u-003",
     actionOwnerId: "u-002",
     status: "IN_PROGRESS",
-    receivedDate: "2026-04-20",
-    dueDate: "2026-04-24",
-    createdAt: "2026-04-20T08:00:00Z",
-    updatedAt: "2026-04-20T08:00:00Z"
+    receivedDate: new Date("2026-04-20T00:00:00.000Z"),
+    dueDate: new Date("2026-04-24T00:00:00.000Z"),
+    createdAt: new Date("2026-04-20T08:00:00.000Z"),
+    updatedAt: new Date("2026-04-20T08:00:00.000Z"),
+    createBy: seededByReceptionist,
+    updateBy: seededByReceptionist
   },
   {
     id: "c-002",
     reference: "BANK-HQ-FIN-202604-000014",
     subject: "Treasury confirmation memo",
     direction: "OUTGOING",
+    fromTo: "Ministry of Finance",
+    organisation: "Ministry of Finance",
     branchId: "b-001",
     departmentId: "d-002",
     registeredById: "u-001",
     recipientId: "u-005",
     actionOwnerId: "u-002",
     status: "AWAITING_REVIEW",
-    receivedDate: "2026-04-20",
-    dueDate: "2026-04-23",
-    createdAt: "2026-04-20T09:00:00Z",
-    updatedAt: "2026-04-20T09:00:00Z"
+    receivedDate: new Date("2026-04-20T00:00:00.000Z"),
+    dueDate: new Date("2026-04-23T00:00:00.000Z"),
+    createdAt: new Date("2026-04-20T09:00:00.000Z"),
+    updatedAt: new Date("2026-04-20T09:00:00.000Z"),
+    createBy: seededByReceptionist,
+    updateBy: seededByReceptionist
   },
   {
     id: "c-003",
     reference: "BANK-BRN-02-FIN-202604-000102",
     subject: "Branch audit exception follow-up",
     direction: "INCOMING",
+    fromTo: "Internal Audit Division",
+    correspondenceDate: new Date("2026-04-17T00:00:00.000Z"),
     branchId: "b-002",
     departmentId: "d-002",
     registeredById: "u-001",
     recipientId: "u-003",
     actionOwnerId: "u-002",
     status: "NEW",
-    receivedDate: "2026-04-18",
-    dueDate: "2026-04-25",
-    createdAt: "2026-04-18T10:00:00Z",
-    updatedAt: "2026-04-18T10:00:00Z"
+    receivedDate: new Date("2026-04-18T00:00:00.000Z"),
+    dueDate: new Date("2026-04-25T00:00:00.000Z"),
+    createdAt: new Date("2026-04-18T10:00:00.000Z"),
+    updatedAt: new Date("2026-04-18T10:00:00.000Z"),
+    createBy: seededByReceptionist,
+    updateBy: seededByReceptionist
   }
 ];

@@ -23,6 +23,7 @@ test("registerCorrespondenceInHost persists outgoing correspondence", async () =
     receptionist,
     {
       subject: "Outgoing policy update",
+      fromTo: "Policy Recipient",
       branchId: "b-001",
       departmentId: "d-002",
       direction: "OUTGOING"
@@ -53,6 +54,7 @@ test("registerCorrespondenceInHost rejects department outside selected branch po
         receptionist,
         {
           subject: "Invalid branch mapping",
+          fromTo: "Branch Sender",
           branchId: "b-002",
           departmentId: "d-001",
           direction: "INCOMING"
