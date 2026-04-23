@@ -1,13 +1,42 @@
 import BetterSqlite3 from "better-sqlite3";
 import type { Database } from "better-sqlite3";
-import {
-  demoActionDefinitions,
-  demoBranches,
-  demoCorrespondences,
-  demoDepartments,
-  demoReferenceConfigs,
-  demoUsers
-} from "../../../application/modules/admin/seedData";
+import type { Branch, Department, AppUser } from "../../../domain/governance";
+import type { ReferenceFormatConfig } from "../../../domain/reference";
+
+const bootstrapBranch: Branch = {
+  id: "branch-bootstrap-main",
+  code: "MAIN",
+  name: "Main Branch",
+  isActive: true
+};
+
+const bootstrapDepartment: Department = {
+  id: "department-bootstrap-admin",
+  code: "ADMIN",
+  name: "Administration",
+  isActive: true
+};
+
+const bootstrapAdminUser: AppUser = {
+  id: "user-bootstrap-admin",
+  employeeCode: "BOOT-001",
+  fullName: "Bootstrap Administrator",
+  email: "bootstrap.admin@local",
+  branchId: bootstrapBranch.id,
+  departmentId: bootstrapDepartment.id,
+  isActive: true,
+  canLogin: true,
+  canOwnActions: true,
+  roles: ["ADMIN", "RECEPTIONIST", "RECIPIENT", "ACTION_OWNER", "COPIED_VIEWER", "DASHBOARD_VIEWER"]
+};
+
+const bootstrapReferenceConfig: ReferenceFormatConfig = {
+  id: "refcfg-bootstrap-global",
+  scope: "GLOBAL",
+  pattern: "{ORG}-{YYYY}{MM}-{SEQ6}",
+  resetPolicy: "MONTHLY",
+  isActive: true
+};
 
 export function openDatabase(dbPath: string): Database {
   const db = new BetterSqlite3(dbPath);
@@ -287,9 +316,7 @@ function seedDatabase(db: Database): void {
       `INSERT INTO branches (id, code, name, isActive)
        VALUES (@id, @code, @name, @isActive)`
     );
-    for (const branch of demoBranches) {
-      insertBranch.run({ ...branch, isActive: branch.isActive ? 1 : 0 });
-    }
+    insertBranch.run({ ...bootstrapBranch, isActive: 1 });
   }
 
   if (!hasRows(db, "departments")) {
@@ -297,9 +324,7 @@ function seedDatabase(db: Database): void {
       `INSERT INTO departments (id, code, name, isActive)
        VALUES (@id, @code, @name, @isActive)`
     );
-    for (const department of demoDepartments) {
-      insertDepartment.run({ ...department, isActive: department.isActive ? 1 : 0 });
-    }
+    insertDepartment.run({ ...bootstrapDepartment, isActive: 1 });
   }
 
   if (!hasRows(db, "users")) {
@@ -309,15 +334,13 @@ function seedDatabase(db: Database): void {
        VALUES
         (@id, @employeeCode, @fullName, @email, @branchId, @departmentId, @isActive, @canLogin, @canOwnActions, @roles)`
     );
-    for (const user of demoUsers) {
-      insertUser.run({
-        ...user,
-        isActive: user.isActive ? 1 : 0,
-        canLogin: user.canLogin ? 1 : 0,
-        canOwnActions: user.canOwnActions ? 1 : 0,
-        roles: JSON.stringify(user.roles)
-      });
-    }
+    insertUser.run({
+      ...bootstrapAdminUser,
+      isActive: 1,
+      canLogin: 1,
+      canOwnActions: 1,
+      roles: JSON.stringify(bootstrapAdminUser.roles)
+    });
   }
 
   if (!hasRows(db, "reference_configs")) {
@@ -327,76 +350,11 @@ function seedDatabase(db: Database): void {
        VALUES
         (@id, @scope, @branchId, @departmentId, @pattern, @resetPolicy, @isActive)`
     );
-    for (const config of demoReferenceConfigs) {
-      insertConfig.run({
-        ...config,
-        branchId: config.branchId ?? null,
-        departmentId: config.departmentId ?? null,
-        isActive: config.isActive ? 1 : 0
-      });
-    }
-  }
-
-  if (!hasRows(db, "correspondences")) {
-    const insertCorrespondence = db.prepare(
-      `INSERT INTO correspondences
-        (id, reference, subject, direction, fromTo, organisation, correspondenceDate, branchId,
-         departmentId, registeredById, recipientId, actionOwnerId, status, receivedDate,
-         dueDate, createdAt, updatedAt, createById, updateById, summary)
-       VALUES
-        (@id, @reference, @subject, @direction, @fromTo, @organisation, @correspondenceDate,
-         @branchId, @departmentId, @registeredById, @recipientId, @actionOwnerId, @status,
-         @receivedDate, @dueDate, @createdAt, @updatedAt, @createById, @updateById, @summary)`
-    );
-    for (const correspondence of demoCorrespondences) {
-      insertCorrespondence.run({
-        ...correspondence,
-        organisation: correspondence.organisation ?? null,
-        correspondenceDate: correspondence.correspondenceDate
-          ? correspondence.correspondenceDate.toISOString()
-          : null,
-        receivedDate: correspondence.receivedDate.toISOString(),
-        dueDate: correspondence.dueDate ? correspondence.dueDate.toISOString() : null,
-        createdAt: correspondence.createdAt.toISOString(),
-        departmentId: correspondence.departmentId ?? null,
-        recipientId: correspondence.recipientId ?? null,
-        actionOwnerId: correspondence.actionOwnerId ?? null,
-        updatedAt: correspondence.updatedAt.toISOString(),
-        createById: correspondence.createBy.id,
-        updateById: correspondence.updateBy.id,
-        summary: correspondence.summary ?? null
-      });
-    }
-  }
-
-  if (!hasRows(db, "correspondence_action_definitions")) {
-    const insertActionDefinition = db.prepare(
-      `INSERT INTO correspondence_action_definitions
-        (id, code, label, description, category, requiresOwner, triggerMode,
-         workflowEnabled, workflowMethod, workflowEndpointUrl, workflowTimeoutMs,
-         authType, authSecretRef, payloadTemplate, retryMaxAttempts, retryBackoffMs,
-         defaultSlaDays, isActive, createdAt, updatedAt)
-       VALUES
-        (@id, @code, @label, @description, @category, @requiresOwner, @triggerMode,
-         @workflowEnabled, @workflowMethod, @workflowEndpointUrl, @workflowTimeoutMs,
-         @authType, @authSecretRef, @payloadTemplate, @retryMaxAttempts, @retryBackoffMs,
-         @defaultSlaDays, @isActive, @createdAt, @updatedAt)`
-    );
-
-    for (const definition of demoActionDefinitions) {
-      insertActionDefinition.run({
-        ...definition,
-        description: definition.description ?? null,
-        requiresOwner: definition.requiresOwner ? 1 : 0,
-        workflowEnabled: definition.workflowEnabled ? 1 : 0,
-        workflowEndpointUrl: definition.workflowEndpointUrl ?? null,
-        authSecretRef: definition.authSecretRef ?? null,
-        payloadTemplate: definition.payloadTemplate ?? null,
-        defaultSlaDays: definition.defaultSlaDays ?? null,
-        isActive: definition.isActive ? 1 : 0,
-        createdAt: definition.createdAt.toISOString(),
-        updatedAt: definition.updatedAt.toISOString()
-      });
-    }
+    insertConfig.run({
+      ...bootstrapReferenceConfig,
+      branchId: null,
+      departmentId: null,
+      isActive: 1
+    });
   }
 }

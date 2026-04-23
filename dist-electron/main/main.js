@@ -59,220 +59,37 @@ function getRuntimeSmtpConfig() {
     connectionTimeoutMs: parsePort(readEnvValue("SMTP_CONNECTION_TIMEOUT_MS"), 3e3)
   };
 }
-const ALL_ROLE_CODES = [
-  "ADMIN",
-  "RECEPTIONIST",
-  "RECIPIENT",
-  "ACTION_OWNER",
-  "COPIED_VIEWER",
-  "DASHBOARD_VIEWER"
-];
-const demoBranches = [
-  { id: "b-001", code: "HQ", name: "Headquarters", isActive: true },
-  { id: "b-002", code: "BRN-02", name: "Branch 02", isActive: true }
-];
-const demoDepartments = [
-  { id: "d-001", code: "OPS", name: "Operations", isActive: true },
-  { id: "d-002", code: "FIN", name: "Finance", isActive: true }
-];
-const demoUsers = [
-  {
-    id: "u-001",
-    employeeCode: "EMP-001",
-    fullName: "Reception User",
-    email: "reception@bank.local",
-    branchId: "b-001",
-    departmentId: "d-001",
-    isActive: true,
-    canLogin: true,
-    canOwnActions: false,
-    roles: ["RECEPTIONIST"]
-  },
-  {
-    id: "u-002",
-    employeeCode: "EMP-002",
-    fullName: "Action Owner",
-    email: "owner@bank.local",
-    branchId: "b-001",
-    departmentId: "d-001",
-    isActive: true,
-    canLogin: true,
-    canOwnActions: true,
-    roles: ["ACTION_OWNER"]
-  },
-  {
-    id: "u-003",
-    employeeCode: "EMP-003",
-    fullName: "Recipient User",
-    email: "recipient@bank.local",
-    branchId: "b-002",
-    departmentId: "d-002",
-    isActive: true,
-    canLogin: true,
-    canOwnActions: false,
-    roles: ["RECIPIENT"]
-  },
-  {
-    id: "u-004",
-    employeeCode: "EMP-000",
-    fullName: "Default Super Admin",
-    email: "superadmin@bank.local",
-    branchId: "b-001",
-    departmentId: "d-001",
-    isActive: true,
-    canLogin: true,
-    canOwnActions: true,
-    roles: [...ALL_ROLE_CODES]
-  },
-  {
-    id: "u-005",
-    employeeCode: "EMP-005",
-    fullName: "Executive Viewer",
-    email: "executive@bank.local",
-    branchId: "b-001",
-    departmentId: "d-002",
-    isActive: true,
-    canLogin: true,
-    canOwnActions: false,
-    roles: ["DASHBOARD_VIEWER", "COPIED_VIEWER"]
-  }
-];
-const demoReferenceConfigs = [
-  {
-    id: "cfg-branch-dept",
-    scope: "BRANCH_DEPARTMENT",
-    branchId: "b-001",
-    departmentId: "d-001",
-    pattern: "{ORG}-{BRANCH}-{DEPT}-{YYYY}{MM}-{SEQ6}",
-    resetPolicy: "MONTHLY",
-    isActive: true
-  },
-  {
-    id: "cfg-branch",
-    scope: "BRANCH",
-    branchId: "b-001",
-    pattern: "{ORG}-{BRANCH}-{YYYY}{MM}-{SEQ5}",
-    resetPolicy: "MONTHLY",
-    isActive: true
-  },
-  {
-    id: "cfg-global",
-    scope: "GLOBAL",
-    pattern: "{ORG}-{YYYY}{MM}-{SEQ4}",
-    resetPolicy: "MONTHLY",
-    isActive: true
-  }
-];
-const demoActionDefinitions = [
-  {
-    id: "act-001",
-    code: "FOR_INFORMATION",
-    label: "For Information",
-    description: "Read-only action; no external workflow is triggered.",
-    category: "INFO",
-    requiresOwner: false,
-    triggerMode: "NONE",
-    workflowEnabled: false,
-    workflowMethod: "POST",
-    workflowTimeoutMs: 1e4,
-    authType: "NONE",
-    retryMaxAttempts: 0,
-    retryBackoffMs: 0,
-    defaultSlaDays: 0,
-    isActive: true,
-    createdAt: /* @__PURE__ */ new Date("2026-04-20T08:00:00.000Z"),
-    updatedAt: /* @__PURE__ */ new Date("2026-04-20T08:00:00.000Z")
-  },
-  {
-    id: "act-002",
-    code: "RESPOND_TO",
-    label: "Respond To",
-    description: "Owner-triggered action that calls an HTTP workflow endpoint.",
-    category: "RESPONSE",
-    requiresOwner: true,
-    triggerMode: "OWNER_EXECUTE",
-    workflowEnabled: true,
-    workflowMethod: "POST",
-    workflowEndpointUrl: "https://workflow.local/respond",
-    workflowTimeoutMs: 15e3,
-    authType: "BEARER_TOKEN_REF",
-    authSecretRef: "secrets/workflow/respond-token",
-    payloadTemplate: '{"correspondenceId":"{{correspondence.id}}","actionCode":"{{action.code}}"}',
-    retryMaxAttempts: 2,
-    retryBackoffMs: 2e3,
-    defaultSlaDays: 3,
-    isActive: true,
-    createdAt: /* @__PURE__ */ new Date("2026-04-20T08:00:00.000Z"),
-    updatedAt: /* @__PURE__ */ new Date("2026-04-20T08:00:00.000Z")
-  }
-];
-const seededByReceptionist = demoUsers.find((user) => user.id === "u-001");
-if (!seededByReceptionist) {
-  throw new Error("Seed user u-001 is required for correspondence audit fields.");
-}
-const demoCorrespondences = [
-  {
-    id: "c-001",
-    reference: "BANK-HQ-OPS-202604-000001",
-    subject: "Regulatory request for Q1 compliance returns",
-    direction: "INCOMING",
-    fromTo: "Central Bank Regulatory Authority",
-    organisation: "Central Bank",
-    correspondenceDate: /* @__PURE__ */ new Date("2026-04-19T00:00:00.000Z"),
-    branchId: "b-001",
-    departmentId: "d-001",
-    registeredById: "u-001",
-    recipientId: "u-003",
-    actionOwnerId: "u-002",
-    status: "IN_PROGRESS",
-    receivedDate: /* @__PURE__ */ new Date("2026-04-20T00:00:00.000Z"),
-    dueDate: /* @__PURE__ */ new Date("2026-04-24T00:00:00.000Z"),
-    createdAt: /* @__PURE__ */ new Date("2026-04-20T08:00:00.000Z"),
-    updatedAt: /* @__PURE__ */ new Date("2026-04-20T08:00:00.000Z"),
-    createBy: seededByReceptionist,
-    updateBy: seededByReceptionist
-  },
-  {
-    id: "c-002",
-    reference: "BANK-HQ-FIN-202604-000014",
-    subject: "Treasury confirmation memo",
-    direction: "OUTGOING",
-    fromTo: "Ministry of Finance",
-    organisation: "Ministry of Finance",
-    branchId: "b-001",
-    departmentId: "d-002",
-    registeredById: "u-001",
-    recipientId: "u-005",
-    actionOwnerId: "u-002",
-    status: "AWAITING_REVIEW",
-    receivedDate: /* @__PURE__ */ new Date("2026-04-20T00:00:00.000Z"),
-    dueDate: /* @__PURE__ */ new Date("2026-04-23T00:00:00.000Z"),
-    createdAt: /* @__PURE__ */ new Date("2026-04-20T09:00:00.000Z"),
-    updatedAt: /* @__PURE__ */ new Date("2026-04-20T09:00:00.000Z"),
-    createBy: seededByReceptionist,
-    updateBy: seededByReceptionist
-  },
-  {
-    id: "c-003",
-    reference: "BANK-BRN-02-FIN-202604-000102",
-    subject: "Branch audit exception follow-up",
-    direction: "INCOMING",
-    fromTo: "Internal Audit Division",
-    correspondenceDate: /* @__PURE__ */ new Date("2026-04-17T00:00:00.000Z"),
-    branchId: "b-002",
-    departmentId: "d-002",
-    registeredById: "u-001",
-    recipientId: "u-003",
-    actionOwnerId: "u-002",
-    status: "NEW",
-    receivedDate: /* @__PURE__ */ new Date("2026-04-18T00:00:00.000Z"),
-    dueDate: /* @__PURE__ */ new Date("2026-04-25T00:00:00.000Z"),
-    createdAt: /* @__PURE__ */ new Date("2026-04-18T10:00:00.000Z"),
-    updatedAt: /* @__PURE__ */ new Date("2026-04-18T10:00:00.000Z"),
-    createBy: seededByReceptionist,
-    updateBy: seededByReceptionist
-  }
-];
+const bootstrapBranch = {
+  id: "branch-bootstrap-main",
+  code: "MAIN",
+  name: "Main Branch",
+  isActive: true
+};
+const bootstrapDepartment = {
+  id: "department-bootstrap-admin",
+  code: "ADMIN",
+  name: "Administration",
+  isActive: true
+};
+const bootstrapAdminUser = {
+  id: "user-bootstrap-admin",
+  employeeCode: "BOOT-001",
+  fullName: "Bootstrap Administrator",
+  email: "bootstrap.admin@local",
+  branchId: bootstrapBranch.id,
+  departmentId: bootstrapDepartment.id,
+  isActive: true,
+  canLogin: true,
+  canOwnActions: true,
+  roles: ["ADMIN", "RECEPTIONIST", "RECIPIENT", "ACTION_OWNER", "COPIED_VIEWER", "DASHBOARD_VIEWER"]
+};
+const bootstrapReferenceConfig = {
+  id: "refcfg-bootstrap-global",
+  scope: "GLOBAL",
+  pattern: "{ORG}-{YYYY}{MM}-{SEQ6}",
+  resetPolicy: "MONTHLY",
+  isActive: true
+};
 function openDatabase(dbPath) {
   const db = new BetterSqlite3(dbPath);
   db.pragma("journal_mode = WAL");
@@ -539,18 +356,14 @@ function seedDatabase(db) {
       `INSERT INTO branches (id, code, name, isActive)
        VALUES (@id, @code, @name, @isActive)`
     );
-    for (const branch of demoBranches) {
-      insertBranch.run({ ...branch, isActive: branch.isActive ? 1 : 0 });
-    }
+    insertBranch.run({ ...bootstrapBranch, isActive: 1 });
   }
   if (!hasRows(db, "departments")) {
     const insertDepartment = db.prepare(
       `INSERT INTO departments (id, code, name, isActive)
        VALUES (@id, @code, @name, @isActive)`
     );
-    for (const department of demoDepartments) {
-      insertDepartment.run({ ...department, isActive: department.isActive ? 1 : 0 });
-    }
+    insertDepartment.run({ ...bootstrapDepartment, isActive: 1 });
   }
   if (!hasRows(db, "users")) {
     const insertUser = db.prepare(
@@ -559,15 +372,13 @@ function seedDatabase(db) {
        VALUES
         (@id, @employeeCode, @fullName, @email, @branchId, @departmentId, @isActive, @canLogin, @canOwnActions, @roles)`
     );
-    for (const user of demoUsers) {
-      insertUser.run({
-        ...user,
-        isActive: user.isActive ? 1 : 0,
-        canLogin: user.canLogin ? 1 : 0,
-        canOwnActions: user.canOwnActions ? 1 : 0,
-        roles: JSON.stringify(user.roles)
-      });
-    }
+    insertUser.run({
+      ...bootstrapAdminUser,
+      isActive: 1,
+      canLogin: 1,
+      canOwnActions: 1,
+      roles: JSON.stringify(bootstrapAdminUser.roles)
+    });
   }
   if (!hasRows(db, "reference_configs")) {
     const insertConfig = db.prepare(
@@ -576,72 +387,12 @@ function seedDatabase(db) {
        VALUES
         (@id, @scope, @branchId, @departmentId, @pattern, @resetPolicy, @isActive)`
     );
-    for (const config of demoReferenceConfigs) {
-      insertConfig.run({
-        ...config,
-        branchId: config.branchId ?? null,
-        departmentId: config.departmentId ?? null,
-        isActive: config.isActive ? 1 : 0
-      });
-    }
-  }
-  if (!hasRows(db, "correspondences")) {
-    const insertCorrespondence = db.prepare(
-      `INSERT INTO correspondences
-        (id, reference, subject, direction, fromTo, organisation, correspondenceDate, branchId,
-         departmentId, registeredById, recipientId, actionOwnerId, status, receivedDate,
-         dueDate, createdAt, updatedAt, createById, updateById, summary)
-       VALUES
-        (@id, @reference, @subject, @direction, @fromTo, @organisation, @correspondenceDate,
-         @branchId, @departmentId, @registeredById, @recipientId, @actionOwnerId, @status,
-         @receivedDate, @dueDate, @createdAt, @updatedAt, @createById, @updateById, @summary)`
-    );
-    for (const correspondence of demoCorrespondences) {
-      insertCorrespondence.run({
-        ...correspondence,
-        organisation: correspondence.organisation ?? null,
-        correspondenceDate: correspondence.correspondenceDate ? correspondence.correspondenceDate.toISOString() : null,
-        receivedDate: correspondence.receivedDate.toISOString(),
-        dueDate: correspondence.dueDate ? correspondence.dueDate.toISOString() : null,
-        createdAt: correspondence.createdAt.toISOString(),
-        departmentId: correspondence.departmentId ?? null,
-        recipientId: correspondence.recipientId ?? null,
-        actionOwnerId: correspondence.actionOwnerId ?? null,
-        updatedAt: correspondence.updatedAt.toISOString(),
-        createById: correspondence.createBy.id,
-        updateById: correspondence.updateBy.id,
-        summary: correspondence.summary ?? null
-      });
-    }
-  }
-  if (!hasRows(db, "correspondence_action_definitions")) {
-    const insertActionDefinition = db.prepare(
-      `INSERT INTO correspondence_action_definitions
-        (id, code, label, description, category, requiresOwner, triggerMode,
-         workflowEnabled, workflowMethod, workflowEndpointUrl, workflowTimeoutMs,
-         authType, authSecretRef, payloadTemplate, retryMaxAttempts, retryBackoffMs,
-         defaultSlaDays, isActive, createdAt, updatedAt)
-       VALUES
-        (@id, @code, @label, @description, @category, @requiresOwner, @triggerMode,
-         @workflowEnabled, @workflowMethod, @workflowEndpointUrl, @workflowTimeoutMs,
-         @authType, @authSecretRef, @payloadTemplate, @retryMaxAttempts, @retryBackoffMs,
-         @defaultSlaDays, @isActive, @createdAt, @updatedAt)`
-    );
-    for (const definition of demoActionDefinitions) {
-      insertActionDefinition.run({
-        ...definition,
-        description: definition.description ?? null,
-        requiresOwner: definition.requiresOwner ? 1 : 0,
-        workflowEnabled: definition.workflowEnabled ? 1 : 0,
-        workflowEndpointUrl: definition.workflowEndpointUrl ?? null,
-        authSecretRef: definition.authSecretRef ?? null,
-        payloadTemplate: definition.payloadTemplate ?? null,
-        defaultSlaDays: definition.defaultSlaDays ?? null,
-        isActive: definition.isActive ? 1 : 0,
-        createdAt: definition.createdAt.toISOString(),
-        updatedAt: definition.updatedAt.toISOString()
-      });
-    }
+    insertConfig.run({
+      ...bootstrapReferenceConfig,
+      branchId: null,
+      departmentId: null,
+      isActive: 1
+    });
   }
 }
 function parseUser(row) {
@@ -1017,6 +768,13 @@ class SqlitePostCaptureWorkflowService {
     this.auditLog = auditLog;
   }
   async execute(command) {
+    if (command.mode === "BASIC") {
+      await this.executeBasic(command);
+      return;
+    }
+    await this.executeExtended(command);
+  }
+  async executeBasic(command) {
     const recipientId = this.resolveRecipientId(command);
     const subject = `Correspondence ${command.correspondence.reference} received`;
     const body = [
@@ -1038,8 +796,60 @@ class SqlitePostCaptureWorkflowService {
       createdById: command.actor.id
     });
   }
+  async executeExtended(command) {
+    await this.auditLog.append({
+      correspondenceId: command.correspondence.id,
+      eventType: "AGENT_CALL",
+      status: "SUCCESS",
+      payloadJson: JSON.stringify({
+        reference: command.correspondence.reference,
+        metadata: command.context?.metadata ?? {},
+        hasDigitalContent: Boolean(command.context?.digitalContent)
+      }),
+      createdById: command.actor.id
+    });
+    const simulatedResponse = this.buildSimulatedAgentResponse(command);
+    await this.auditLog.append({
+      correspondenceId: command.correspondence.id,
+      eventType: "AGENT_RESPONSE",
+      status: "SUCCESS",
+      payloadJson: JSON.stringify(simulatedResponse),
+      createdById: command.actor.id
+    });
+    const recipientId = this.resolveRecipientId(command);
+    await this.notifications.send({
+      recipientId,
+      subject: simulatedResponse.mail.subject,
+      body: simulatedResponse.mail.body,
+      correspondenceId: command.correspondence.id
+    });
+    await this.auditLog.append({
+      correspondenceId: command.correspondence.id,
+      eventType: "NOTIFICATION_SENT",
+      status: "SUCCESS",
+      payloadJson: JSON.stringify({ mode: "EXTENDED", recipientId, subject: simulatedResponse.mail.subject }),
+      createdById: command.actor.id
+    });
+  }
   resolveRecipientId(command) {
     return command.correspondence.recipientId ?? command.correspondence.actionOwnerId ?? command.actor.id;
+  }
+  buildSimulatedAgentResponse(command) {
+    return {
+      summary: `Automated summary for ${command.correspondence.reference}`,
+      suggestedAction: "Assign to action owner and acknowledge sender",
+      ownerId: command.correspondence.actionOwnerId,
+      deadline: command.correspondence.dueDate?.toISOString() ?? new Date(Date.now() + 3 * 24 * 3600 * 1e3).toISOString(),
+      confidenceScore: 0.84,
+      mail: {
+        subject: `Action required: ${command.correspondence.reference}`,
+        body: [
+          "The correspondence has been analyzed by the simulated agent.",
+          `Summary: Automated summary for ${command.correspondence.reference}`,
+          "Suggested action: Assign to action owner and acknowledge sender"
+        ].join("\n")
+      }
+    };
   }
 }
 function rowToConfig(row) {
@@ -1232,10 +1042,14 @@ function configureStoragePaths() {
   const baseDir = path.join(localAppData, "Correspondance Management");
   const userDataDir = path.join(baseDir, "userData");
   const sessionDataDir = path.join(baseDir, "sessionData");
+  const cacheDir = path.join(baseDir, "cache");
   fs.mkdirSync(userDataDir, { recursive: true });
   fs.mkdirSync(sessionDataDir, { recursive: true });
+  fs.mkdirSync(cacheDir, { recursive: true });
   app.setPath("userData", userDataDir);
   app.setPath("sessionData", sessionDataDir);
+  app.setPath("cache", cacheDir);
+  app.commandLine.appendSwitch("disk-cache-dir", cacheDir);
 }
 configureStoragePaths();
 function createWindow() {

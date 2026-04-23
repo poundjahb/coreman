@@ -1,5 +1,6 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
 import {
+  Alert,
   AppShell,
   Avatar,
   Box,
@@ -30,8 +31,6 @@ import {
 import { Navigate, NavLink as RouterNavLink, Route, Routes, useLocation } from "react-router-dom";
 import type { AppUser, RoleCode } from "./domain/governance";
 import { hasRole } from "./application/services/accessControl";
-import { getPlatformIndicator } from "./platform/hostAdapterFactory";
-import { getRuntimePlatformTarget } from "./platform/runtimePlatformTarget";
 import { runtimeHostAdapter } from "./platform/runtimeHostAdapter";
 import { AccessDeniedState } from "./ui/components/AccessDeniedState";
 import { ReceptionistDashboardPage } from "./ui/screens/ReceptionistDashboardPage";
@@ -55,6 +54,33 @@ import {
   AdminUsersPage
 } from "./ui/screens/admin/AdminPages";
 
+const bootstrapBranch = {
+  id: "branch-bootstrap-main",
+  code: "MAIN",
+  name: "Main Branch",
+  isActive: true
+};
+
+const bootstrapDepartment = {
+  id: "department-bootstrap-admin",
+  code: "ADMIN",
+  name: "Administration",
+  isActive: true
+};
+
+const fallbackAdminUser: AppUser = {
+  id: "user-bootstrap-admin",
+  employeeCode: "BOOT-001",
+  fullName: "Bootstrap Administrator",
+  email: "bootstrap.admin@local",
+  branchId: bootstrapBranch.id,
+  departmentId: bootstrapDepartment.id,
+  isActive: true,
+  canLogin: true,
+  canOwnActions: true,
+  roles: ["ADMIN", "RECEPTIONIST", "RECIPIENT", "ACTION_OWNER", "COPIED_VIEWER", "DASHBOARD_VIEWER"]
+};
+
 interface RoleMenuItem {
   label: string;
   to: string;
@@ -64,6 +90,18 @@ interface RoleMenuItem {
 interface RoleMenuSection {
   title: string;
   items: RoleMenuItem[];
+}
+
+interface StartupState {
+  loading: boolean;
+  error: string | null;
+  issues: string[];
+}
+
+interface StartupResources {
+  users: AppUser[];
+  branches: Array<{ isActive: boolean; id: string }>;
+  departments: Array<{ isActive: boolean; id: string }>;
 }
 
 function hasAnyRole(user: AppUser, roles: RoleCode[]): boolean {
@@ -143,48 +181,190 @@ function getRoleMenuSections(currentUser: AppUser): RoleMenuSection[] {
   return sections;
 }
 
+function StartupSetupState(props: {
+  currentUser: AppUser;
+  issues: string[];
+  error?: string | null;
+}): JSX.Element {
+  const { currentUser, issues, error } = props;
+  const isAdmin = hasRole(currentUser, "ADMIN");
+
+  return (
+    <Alert color="yellow" title="System setup is incomplete" mb="md">
+      <Text size="sm">
+        {error ?? "The application started, but required first-run data is still missing."}
+      </Text>
+      {issues.length > 0 && (
+        <Stack gap={4} mt="md">
+          {issues.map((issue) => (
+            <Text key={issue} size="sm">- {issue}</Text>
+          ))}
+        </Stack>
+      )}
+      <Text c="dimmed" size="sm" mt="md">
+        {isAdmin
+          ? "Use the Admin pages to complete setup. Operational pages remain available, but setup-dependent actions can still fail until configuration is complete."
+          : "Operational pages remain available, but an administrator should complete setup before setup-dependent actions are used."}
+      </Text>
+    </Alert>
+  );
+}
+
+async function ensureBootstrapResources(resources: StartupResources): Promise<{ resources: StartupResources; issues: string[] }> {
+  const issues: string[] = [];
+  let attemptedBootstrap = false;
+
+  if (!resources.branches.some((branch) => branch.isActive)) {
+    attemptedBootstrap = true;
+    try {
+      await runtimeHostAdapter.branches.save(bootstrapBranch);
+    } catch (error) {
+      issues.push(error instanceof Error ? `Default branch bootstrap failed: ${error.message}` : "Default branch bootstrap failed.");
+    }
+  }
+
+  if (!resources.departments.some((department) => department.isActive)) {
+    attemptedBootstrap = true;
+    try {
+      await runtimeHostAdapter.departments.save(bootstrapDepartment);
+    } catch (error) {
+      issues.push(error instanceof Error ? `Default department bootstrap failed: ${error.message}` : "Default department bootstrap failed.");
+    }
+  }
+
+  if (!resources.users.some((user) => user.isActive && user.canLogin)) {
+    attemptedBootstrap = true;
+    try {
+      await runtimeHostAdapter.users.save(fallbackAdminUser);
+    } catch (error) {
+      issues.push(error instanceof Error ? `Default admin bootstrap failed: ${error.message}` : "Default admin bootstrap failed.");
+    }
+  }
+
+  if (!attemptedBootstrap) {
+    return { resources, issues };
+  }
+
+  try {
+    const [users, branches, departments] = await Promise.all([
+      runtimeHostAdapter.users.findAll(),
+      runtimeHostAdapter.branches.findAll(),
+      runtimeHostAdapter.departments.findAll()
+    ]);
+
+    return {
+      resources: {
+        users,
+        branches,
+        departments
+      },
+      issues
+    };
+  } catch (error) {
+    issues.push(error instanceof Error ? `Bootstrap verification failed: ${error.message}` : "Bootstrap verification failed.");
+    return { resources, issues };
+  }
+}
+
+function getDefaultRoute(currentUser: AppUser, startupIssuesPresent: boolean): string {
+  if (startupIssuesPresent && hasRole(currentUser, "ADMIN")) {
+    return "/admin/reference";
+  }
+
+  if (hasRole(currentUser, "RECEPTIONIST") || hasRole(currentUser, "ADMIN")) {
+    return "/receptionist/dashboard";
+  }
+
+  if (hasRole(currentUser, "RECIPIENT") || hasRole(currentUser, "ACTION_OWNER")) {
+    return "/work/dashboard";
+  }
+
+  if (hasRole(currentUser, "DASHBOARD_VIEWER")) {
+    return "/general-dashboard";
+  }
+
+  return "/search";
+}
+
 export function App(): JSX.Element {
   const [navbarCollapsed, setNavbarCollapsed] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [availableUsers, setAvailableUsers] = useState<AppUser[]>([]);
-  const [usersError, setUsersError] = useState<string | null>(null);
+  const [startupState, setStartupState] = useState<StartupState>({
+    loading: true,
+    error: null,
+    issues: []
+  });
   const location = useLocation();
-  const runtimePlatformTarget = useMemo(() => getRuntimePlatformTarget(), []);
-  const platformIndicator = useMemo(
-    () => getPlatformIndicator(runtimePlatformTarget),
-    [runtimePlatformTarget]
-  );
+  const platformIndicator = useMemo(() => runtimeHostAdapter.platform, []);
 
   useEffect(() => {
     let active = true;
 
-    async function loadUsers(): Promise<void> {
+    async function loadStartupData(): Promise<void> {
       try {
-        setUsersError(null);
-        const users = await runtimeHostAdapter.users.findAll();
+        setStartupState({ loading: true, error: null, issues: [] });
+        const [users, branches, departments, referenceConfigs] = await Promise.all([
+          runtimeHostAdapter.users.findAll(),
+          runtimeHostAdapter.branches.findAll(),
+          runtimeHostAdapter.departments.findAll(),
+          runtimeHostAdapter.referenceConfigs.findActive()
+        ]);
 
         if (!active) {
           return;
         }
 
-        setAvailableUsers(users);
+        const bootstrapResult = await ensureBootstrapResources({
+          users,
+          branches,
+          departments
+        });
+        const hydratedUsers = bootstrapResult.resources.users;
+        const hydratedBranches = bootstrapResult.resources.branches;
+        const hydratedDepartments = bootstrapResult.resources.departments;
+        const loginUsers = hydratedUsers.filter((user) => user.isActive && user.canLogin);
+        const issues: string[] = [];
+
+        if (loginUsers.length === 0) {
+          issues.push("At least one active login-enabled user is required.");
+        }
+
+        if (!hydratedBranches.some((branch) => branch.isActive)) {
+          issues.push("At least one active branch is required.");
+        }
+
+        if (!hydratedDepartments.some((department) => department.isActive)) {
+          issues.push("At least one active department is required.");
+        }
+
+        if (referenceConfigs.length === 0) {
+          issues.push("At least one active reference format is required.");
+        }
+
+        issues.push(...bootstrapResult.issues);
+
+        setAvailableUsers(loginUsers);
         setCurrentUserId((current) => {
-          if (current && users.some((user) => user.id === current)) {
+          if (current && loginUsers.some((user) => user.id === current)) {
             return current;
           }
 
-          return users[0]?.id ?? null;
+          return loginUsers[0]?.id ?? null;
         });
+        setStartupState({ loading: false, error: null, issues });
       } catch (loadError) {
         if (!active) {
           return;
         }
 
-        setUsersError(loadError instanceof Error ? loadError.message : "Unable to load users.");
+        const message = loadError instanceof Error ? loadError.message : "Unable to load startup data.";
+        setAvailableUsers([]);
+        setStartupState({ loading: false, error: message, issues: [] });
       }
     }
 
-    void loadUsers();
+    void loadStartupData();
 
     return () => {
       active = false;
@@ -192,37 +372,46 @@ export function App(): JSX.Element {
   }, []);
 
   const currentUser = useMemo(
-    () => availableUsers.find((user) => user.id === currentUserId) ?? availableUsers[0] ?? null,
+    () => availableUsers.find((user) => user.id === currentUserId) ?? availableUsers[0] ?? fallbackAdminUser,
     [availableUsers, currentUserId]
   );
 
   const roleMenuSections = useMemo(
-    () => (currentUser ? getRoleMenuSections(currentUser) : []),
+    () => getRoleMenuSections(currentUser),
     [currentUser]
+  );
+
+  const selectableUsers = useMemo(
+    () => (availableUsers.length > 0 ? availableUsers : [fallbackAdminUser]),
+    [availableUsers]
   );
 
   async function refreshUsers(): Promise<void> {
     const users = await runtimeHostAdapter.users.findAll();
-    setAvailableUsers(users);
+    const loginUsers = users.filter((user) => user.isActive && user.canLogin);
+    setAvailableUsers(loginUsers);
     setCurrentUserId((current) => {
-      if (current && users.some((user) => user.id === current)) {
+      if (current && loginUsers.some((user) => user.id === current)) {
         return current;
       }
 
-      return users[0]?.id ?? null;
+      return loginUsers[0]?.id ?? null;
     });
   }
 
-  if (!currentUser) {
+  if (startupState.loading) {
     return (
       <Box p="lg">
-        <Title order={3}>No active user available</Title>
+        <Title order={3}>Loading workspace</Title>
         <Text c="dimmed" mt="xs">
-          {usersError ?? "Seed or create at least one user record to continue."}
+          Validating first-run setup and startup data.
         </Text>
       </Box>
     );
   }
+
+  const startupIssuesPresent = startupState.issues.length > 0 || Boolean(startupState.error);
+  const defaultRoute = getDefaultRoute(currentUser, startupIssuesPresent);
 
   return (
     <AppShell
@@ -318,9 +507,9 @@ export function App(): JSX.Element {
           <Stack gap="xs">
             {!navbarCollapsed && (
               <Select
-                value={currentUserId}
+                value={selectableUsers.some((user) => user.id === currentUserId) ? currentUserId : currentUser.id}
                 onChange={(value) => setCurrentUserId(value)}
-                data={availableUsers.map((user) => ({
+                data={selectableUsers.map((user) => ({
                   value: user.id,
                   label: user.fullName
                 }))}
@@ -335,8 +524,11 @@ export function App(): JSX.Element {
 
       <AppShell.Main>
         <Box key={location.pathname} className="workspace-main-reveal">
+          {startupIssuesPresent && (
+            <StartupSetupState currentUser={currentUser} issues={startupState.issues} error={startupState.error} />
+          )}
           <Routes>
-            <Route path="/" element={<Navigate to="/receptionist/dashboard" replace />} />
+            <Route path="/" element={<Navigate to={defaultRoute} replace />} />
 
           <Route
             path="/receptionist/dashboard"
@@ -489,7 +681,7 @@ export function App(): JSX.Element {
             }
           />
 
-            <Route path="*" element={<Navigate to="/receptionist/dashboard" replace />} />
+            <Route path="*" element={<Navigate to={defaultRoute} replace />} />
           </Routes>
         </Box>
       </AppShell.Main>

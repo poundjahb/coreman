@@ -31,7 +31,7 @@ export function WorkDashboardPage({ currentUser }: WorkDashboardPageProps): JSX.
 
   const stats = useMemo(() => {
     const completed = tasks.filter((task) => task.status === "Completed").length;
-    const completion = Math.round((completed / tasks.length) * 100);
+    const completion = tasks.length === 0 ? 0 : Math.round((completed / tasks.length) * 100);
     const overdue = tasks.filter((task) => task.dueDate < "2026-04-20" && task.status !== "Completed").length;
     const escalated = tasks.filter((task) => task.status === "Blocked").length;
 

@@ -50,7 +50,7 @@ export function resolveConfig(
 
   const global = active.find((config) => config.scope === "GLOBAL");
   if (!global) {
-    throw new Error("No active reference format was found for this context.");
+    throw new Error("System setup is incomplete: no active reference format is configured.");
   }
 
   return global;
@@ -90,6 +90,9 @@ export function generateReference(
   const periodKey = getPeriodKey(context.now, config.resetPolicy);
   const scopeKey = [config.scope, context.branchId, context.departmentId ?? "NONE", periodKey].join("|");
   const sequence = sequenceStore.next(scopeKey);
+  if (typeof sequence !== "number") {
+    throw new Error("Synchronous reference generation requires a synchronous sequence store.");
+  }
 
   return {
     value: renderPattern(config.pattern, context, sequence),

@@ -103,8 +103,14 @@ export async function registerCorrespondenceInHost(
     throw new Error("The selected department could not be found.");
   }
 
-  if (!isDepartmentAllowedForBranch(input.branchId, input.departmentId)) {
+  if (!isDepartmentAllowedForBranch(input.branchId, input.departmentId, departments)) {
     throw new Error("The selected department is not allowed for this branch.");
+  }
+
+  if (configs.length === 0) {
+    throw new Error(
+      "System setup is incomplete: configure at least one active reference format before registering correspondence."
+    );
   }
 
   const userIds = new Set(users.map((user) => user.id));

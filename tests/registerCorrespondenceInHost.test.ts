@@ -46,9 +46,36 @@ test("registerCorrespondenceInHost persists outgoing correspondence", async () =
   assert.equal(saved.status, "NEW");
 });
 
-test("registerCorrespondenceInHost rejects department outside selected branch policy", async () => {
+test("registerCorrespondenceInHost accepts active departments while branch mapping is not persisted", async () => {
   const adapter = createInMemoryHostAdapter();
   const receptionist = getReceptionist();
+
+  const result = await registerCorrespondenceInHost(
+    adapter,
+    receptionist,
+    {
+      subject: "Cross-branch active department",
+      fromTo: "Branch Sender",
+      branchId: "b-002",
+      departmentId: "d-001",
+      direction: "INCOMING"
+    },
+    "BANK"
+  );
+
+  assert.ok(result.referenceNumber.length > 0);
+});
+
+test("registerCorrespondenceInHost rejects inactive department", async () => {
+  const adapter = createInMemoryHostAdapter();
+  const receptionist = getReceptionist();
+
+  await adapter.departments.save({
+    id: "d-999",
+    code: "INACTIVE",
+    name: "Inactive Department",
+    isActive: false
+  });
 
   await assert.rejects(
     () =>
@@ -56,10 +83,10 @@ test("registerCorrespondenceInHost rejects department outside selected branch po
         adapter,
         receptionist,
         {
-          subject: "Invalid branch mapping",
+          subject: "Inactive department",
           fromTo: "Branch Sender",
-          branchId: "b-002",
-          departmentId: "d-001",
+          branchId: "b-001",
+          departmentId: "d-999",
           direction: "INCOMING"
         },
         "BANK"

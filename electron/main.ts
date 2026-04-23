@@ -27,12 +27,19 @@ function configureStoragePaths(): void {
   const baseDir = path.join(localAppData, "Correspondance Management");
   const userDataDir = path.join(baseDir, "userData");
   const sessionDataDir = path.join(baseDir, "sessionData");
+  const cacheDir = path.join(baseDir, "cache");
 
   fs.mkdirSync(userDataDir, { recursive: true });
   fs.mkdirSync(sessionDataDir, { recursive: true });
+  fs.mkdirSync(cacheDir, { recursive: true });
 
   app.setPath("userData", userDataDir);
   app.setPath("sessionData", sessionDataDir);
+  app.setPath("cache", cacheDir);
+
+  // Tell Chromium's blockfile HTTP cache backend to use the same directory.
+  // app.setPath("cache") alone does not redirect it — the command-line switch is required.
+  app.commandLine.appendSwitch("disk-cache-dir", cacheDir);
 }
 
 configureStoragePaths();

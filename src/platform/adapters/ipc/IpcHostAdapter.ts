@@ -16,8 +16,21 @@ export const sqlitePlatformIndicator = buildPlatformIndicator({
  * Sequence generation is intentionally unavailable in the renderer — it is
  * handled by the main process when saving a correspondence.
  */
+function getElectronAPI() {
+  if (typeof window === "undefined" || typeof window.electronAPI === "undefined") {
+    throw new Error(
+      "Electron API bridge (window.electronAPI) is unavailable. " +
+      "Start the application via the Electron (SQLITE) launcher, not a plain browser or Vite dev server."
+    );
+  }
+  return window.electronAPI;
+}
+
 export function createIpcHostAdapter(): IHostAdapter {
-  const api = window.electronAPI;
+  // Validate Electron bridge exists at creation time (strict mode enforcement).
+  // This ensures we fail fast and explicitly if run outside Electron, rather than
+  // silently degrading or failing later during actual IPC calls.
+  const api = getElectronAPI();
   return {
     platform: sqlitePlatformIndicator,
     correspondences: {

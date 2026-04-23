@@ -3,16 +3,11 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "main": "dist-electron/main/main.js",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
     "test": "npx --yes tsx --test tests/*.test.ts",
-    "preview": "vite preview",
-    "electron:dev": "electron-vite dev",
-    "electron:build": "electron-vite build",
-    "electron:preview": "electron-vite preview",
-    "package": "electron-vite build && electron-builder"
+    "preview": "vite preview"
   },
   "dependencies": {
     "@mantine/core": "^7.17.8",
@@ -35,40 +30,8 @@
     "@types/react-dom": "^18.3.1",
     "@types/smtp-server": "^3.5.13",
     "@vitejs/plugin-react": "^4.3.1",
-    "electron": "^41.2.2",
-    "electron-builder": "^26.8.1",
-    "electron-vite": "^5.0.0",
     "smtp-server": "^3.18.4",
     "typescript": "^5.6.2",
     "vite": "^5.4.8"
-  },
-  "build": {
-    "appId": "com.hbtech.coreman",
-    "productName": "Correspondance Management",
-    "directories": {
-      "output": "release"
-    },
-    "files": [
-      "dist/**",
-      "dist-electron/**"
-    ],
-    "extraResources": [
-      {
-        "from": "node_modules/better-sqlite3/build/Release",
-        "to": "native",
-        "filter": [
-          "*.node"
-        ]
-      }
-    ],
-    "win": {
-      "target": "nsis"
-    },
-    "mac": {
-      "target": "dmg"
-    },
-    "linux": {
-      "target": "AppImage"
-    }
   }
 }

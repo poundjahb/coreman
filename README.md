@@ -68,7 +68,10 @@ Node.js and npm are required but currently unavailable in this machine session. 
 npm install
 cd .\scripts
 
-# SQLITE (Electron + IPC)
+# SERVER (browser + centralized API expected)
+.\start-server.ps1
+
+# SQLITE (server mode + sqlite provider intent, development only)
 .\start-sqlite.ps1
 
 # IN_MEMORY (Vite web mode)
@@ -78,9 +81,10 @@ cd .\scripts
 .\start-dataverse.ps1
 ```
 
-Optional dispatcher scripts (default target is SQLITE):
+Optional dispatcher scripts (default target is SERVER):
 
 ```powershell
+.\start.ps1 -Platform SERVER
 .\start.ps1 -Platform SQLITE
 .\start.ps1 -Platform IN_MEMORY
 .\start.ps1 -Platform DATAVERSE

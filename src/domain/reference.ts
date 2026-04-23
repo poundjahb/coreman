@@ -21,7 +21,7 @@ export interface ReferenceContext {
 }
 
 export interface SequenceStore {
-  next(key: string): number;
+  next(key: string): number | Promise<number>;
 }
 
 export interface GeneratedReference {

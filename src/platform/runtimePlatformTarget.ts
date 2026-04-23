@@ -1,6 +1,6 @@
 import { platformConfig, type PlatformTarget } from "../config/systemConfig";
 
-const validTargets: ReadonlySet<PlatformTarget> = new Set(["IN_MEMORY", "DATAVERSE", "SQLITE"]);
+const validTargets: ReadonlySet<PlatformTarget> = new Set(["IN_MEMORY", "DATAVERSE", "SQLITE", "SERVER"]);
 
 export function getRuntimePlatformTarget(): PlatformTarget {
   const rawTarget = import.meta.env.VITE_PLATFORM_TARGET;

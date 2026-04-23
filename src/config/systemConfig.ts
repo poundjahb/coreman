@@ -1,6 +1,6 @@
 import type { SystemConfig } from "../domain/governance";
 
-export type PlatformTarget = "IN_MEMORY" | "DATAVERSE" | "SQLITE";
+export type PlatformTarget = "IN_MEMORY" | "DATAVERSE" | "SQLITE" | "SERVER";
 export type WorkflowMode = "BASIC" | "EXTENDED";
 
 export interface PlatformConfig {
@@ -27,7 +27,7 @@ export const systemConfig: SystemConfig = {
 };
 
 export const platformConfig: PlatformConfig = {
-  target: "SQLITE"
+  target: "SERVER"
 };
 
 export const workflowConfig: WorkflowConfig = {

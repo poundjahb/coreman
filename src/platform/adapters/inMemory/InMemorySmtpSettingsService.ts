@@ -17,6 +17,8 @@ export class InMemorySmtpSettingsService implements ISmtpSettingsService {
   }
 
   async sendTestEmail(_command: SendTestEmailCommand): Promise<void> {
-    // In-memory mode does not have an SMTP transport.
+    throw new Error(
+      "SMTP test send is unavailable in IN_MEMORY mode. Start SQLITE (Electron) mode to send real test emails."
+    );
   }
 }

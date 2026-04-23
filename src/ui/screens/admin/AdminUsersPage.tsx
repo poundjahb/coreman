@@ -112,7 +112,7 @@ export function AdminUsersPage(props: { onUsersChanged?: () => Promise<void> | v
       return;
     }
 
-    if (!isDepartmentAllowedForBranch(editor.branchId, editor.departmentId)) {
+    if (!isDepartmentAllowedForBranch(editor.branchId, editor.departmentId, departments)) {
       setError("The selected department is not allowed for the selected branch.");
       return;
     }

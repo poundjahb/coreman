@@ -13,10 +13,14 @@ import {
   Title
 } from "@mantine/core";
 import type { SmtpConfig } from "../../../config/systemConfig";
-import { runtimeHostAdapter } from "../../../platform/runtimeHostAdapter";
+import { runtimeHostAdapter, runtimePlatformTarget } from "../../../platform/runtimeHostAdapter";
 
 export function AdminSmtpSettingsPage(props?: { embedded?: boolean }): JSX.Element {
   const embedded = props?.embedded ?? false;
+  const activePlatformTarget = runtimeHostAdapter.platform.target;
+  const configuredPlatformTarget = runtimePlatformTarget;
+  const hasPlatformFallback = configuredPlatformTarget !== activePlatformTarget;
+  const smtpTransportAvailable = activePlatformTarget === "SQLITE";
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
@@ -117,6 +121,12 @@ export function AdminSmtpSettingsPage(props?: { embedded?: boolean }): JSX.Eleme
       setError(null);
       setSuccess(null);
 
+      if (!smtpTransportAvailable) {
+        throw new Error(
+          `SMTP test send is unavailable in ${activePlatformTarget} mode. Start SQLITE (Electron) mode to send real test emails.`
+        );
+      }
+
       if (!testRecipient.trim()) {
         throw new Error("Provide a recipient email for test send.");
       }
@@ -137,28 +147,8 @@ export function AdminSmtpSettingsPage(props?: { embedded?: boolean }): JSX.Eleme
     }
   }
 
-  function handleFormKeyDownCapture(event: React.KeyboardEvent<HTMLElement>): void {
-    const target = event.target as HTMLElement | null;
-    if (!target) {
-      return;
-    }
-
-    const tagName = target.tagName;
-    const isFormField =
-      tagName === "INPUT" ||
-      tagName === "TEXTAREA" ||
-      tagName === "SELECT" ||
-      target.getAttribute("contenteditable") === "true";
-
-    if (isFormField) {
-        // Prevent app-level shortcuts from hijacking normal typing in form inputs
-        event.stopPropagation();
-        event.preventDefault();
-    }
-  }
-
   const content = (
-    <Stack gap="lg" onKeyDownCapture={handleFormKeyDownCapture}>
+    <Stack gap="lg">
       {!embedded && (
         <div>
           <Title order={2}>Admin - SMTP Settings</Title>
@@ -174,6 +164,18 @@ export function AdminSmtpSettingsPage(props?: { embedded?: boolean }): JSX.Eleme
       {success && (
         <Alert color="green" title="SMTP Operation Successful">
           {success}
+        </Alert>
+      )}
+
+      {hasPlatformFallback && (
+        <Alert color="yellow" title="Platform Fallback Detected">
+          {`Configured target is ${configuredPlatformTarget}, but active adapter is ${activePlatformTarget}. SQLite target falls back when the Electron bridge is unavailable, and SMTP test send will not reach a real transport.`}
+        </Alert>
+      )}
+
+      {!smtpTransportAvailable && !hasPlatformFallback && (
+        <Alert color="yellow" title="SMTP Transport Unavailable">
+          {`Active mode is ${activePlatformTarget}. Start SQLITE (Electron) mode to run SMTP test delivery.`}
         </Alert>
       )}
 
@@ -242,7 +244,14 @@ export function AdminSmtpSettingsPage(props?: { embedded?: boolean }): JSX.Eleme
 
             <Group justify="flex-end">
               <Button variant="default" onClick={() => void loadConfig()}>Reload</Button>
-              <Button variant="light" onClick={() => void handleTestSend()} loading={testing}>Test Send</Button>
+              <Button
+                variant="light"
+                onClick={() => void handleTestSend()}
+                loading={testing}
+                disabled={!smtpTransportAvailable || loading}
+              >
+                Test Send
+              </Button>
               <Button onClick={() => void handleSave()} loading={saving}>Save Configuration</Button>
             </Group>
           </Stack>
