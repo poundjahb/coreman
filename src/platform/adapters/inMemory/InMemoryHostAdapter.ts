@@ -1,5 +1,6 @@
 import { InMemorySequenceStore } from "../../../application/services/referenceEngine";
 import {
+  demoActionDefinitions,
   demoBranches,
   demoCorrespondences,
   demoDepartments,
@@ -8,6 +9,7 @@ import {
 } from "../../../application/modules/admin/seedData";
 import type { IHostAdapter } from "../../IHostAdapter";
 import { InMemoryBranchRepository } from "./InMemoryBranchRepository";
+import { InMemoryCorrespondenceActionDefinitionRepository } from "./InMemoryCorrespondenceActionDefinitionRepository";
 import { InMemoryCorrespondenceRepository } from "./InMemoryCorrespondenceRepository";
 import { InMemoryDepartmentRepository } from "./InMemoryDepartmentRepository";
 import { InMemoryNotificationService } from "./InMemoryNotificationService";
@@ -36,6 +38,7 @@ export function createInMemoryHostAdapter(): IHostAdapter {
     users: new InMemoryUserRepository(demoUsers),
     branches: new InMemoryBranchRepository(demoBranches),
     departments: new InMemoryDepartmentRepository(demoDepartments),
+    actionDefinitions: new InMemoryCorrespondenceActionDefinitionRepository(demoActionDefinitions),
     referenceConfigs: new InMemoryReferenceConfigRepository(demoReferenceConfigs),
     smtpSettings,
     notifications,

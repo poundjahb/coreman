@@ -1,6 +1,7 @@
 import BetterSqlite3 from "better-sqlite3";
 import type { Database } from "better-sqlite3";
 import {
+  demoActionDefinitions,
   demoBranches,
   demoCorrespondences,
   demoDepartments,
@@ -114,6 +115,29 @@ function initSchema(db: Database): void {
       fromAddress         TEXT NOT NULL,
       connectionTimeoutMs INTEGER NOT NULL,
       updatedAt           TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS correspondence_action_definitions (
+      id                 TEXT PRIMARY KEY,
+      code               TEXT NOT NULL UNIQUE,
+      label              TEXT NOT NULL,
+      description        TEXT,
+      category           TEXT NOT NULL,
+      requiresOwner      INTEGER NOT NULL,
+      triggerMode        TEXT NOT NULL,
+      workflowEnabled    INTEGER NOT NULL,
+      workflowMethod     TEXT NOT NULL,
+      workflowEndpointUrl TEXT,
+      workflowTimeoutMs  INTEGER NOT NULL,
+      authType           TEXT NOT NULL,
+      authSecretRef      TEXT,
+      payloadTemplate    TEXT,
+      retryMaxAttempts   INTEGER NOT NULL,
+      retryBackoffMs     INTEGER NOT NULL,
+      defaultSlaDays     INTEGER,
+      isActive           INTEGER NOT NULL,
+      createdAt          TEXT NOT NULL,
+      updatedAt          TEXT NOT NULL
     );
   `);
 
@@ -341,6 +365,37 @@ function seedDatabase(db: Database): void {
         createById: correspondence.createBy.id,
         updateById: correspondence.updateBy.id,
         summary: correspondence.summary ?? null
+      });
+    }
+  }
+
+  if (!hasRows(db, "correspondence_action_definitions")) {
+    const insertActionDefinition = db.prepare(
+      `INSERT INTO correspondence_action_definitions
+        (id, code, label, description, category, requiresOwner, triggerMode,
+         workflowEnabled, workflowMethod, workflowEndpointUrl, workflowTimeoutMs,
+         authType, authSecretRef, payloadTemplate, retryMaxAttempts, retryBackoffMs,
+         defaultSlaDays, isActive, createdAt, updatedAt)
+       VALUES
+        (@id, @code, @label, @description, @category, @requiresOwner, @triggerMode,
+         @workflowEnabled, @workflowMethod, @workflowEndpointUrl, @workflowTimeoutMs,
+         @authType, @authSecretRef, @payloadTemplate, @retryMaxAttempts, @retryBackoffMs,
+         @defaultSlaDays, @isActive, @createdAt, @updatedAt)`
+    );
+
+    for (const definition of demoActionDefinitions) {
+      insertActionDefinition.run({
+        ...definition,
+        description: definition.description ?? null,
+        requiresOwner: definition.requiresOwner ? 1 : 0,
+        workflowEnabled: definition.workflowEnabled ? 1 : 0,
+        workflowEndpointUrl: definition.workflowEndpointUrl ?? null,
+        authSecretRef: definition.authSecretRef ?? null,
+        payloadTemplate: definition.payloadTemplate ?? null,
+        defaultSlaDays: definition.defaultSlaDays ?? null,
+        isActive: definition.isActive ? 1 : 0,
+        createdAt: definition.createdAt.toISOString(),
+        updatedAt: definition.updatedAt.toISOString()
       });
     }
   }

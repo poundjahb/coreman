@@ -26,12 +26,31 @@ contextBridge.exposeInMainWorld("electronAPI", {
     save: (department) => ipcRenderer.invoke("departments:save", department),
     delete: (id) => ipcRenderer.invoke("departments:delete", id)
   },
+  actionDefinitions: {
+    findById: (id) => ipcRenderer.invoke("actionDefinitions:findById", id),
+    findAll: () => ipcRenderer.invoke("actionDefinitions:findAll"),
+    findActive: () => ipcRenderer.invoke("actionDefinitions:findActive"),
+    save: (definition) => ipcRenderer.invoke("actionDefinitions:save", definition),
+    delete: (id) => ipcRenderer.invoke("actionDefinitions:delete", id)
+  },
   referenceConfigs: {
     findAll: () => ipcRenderer.invoke("referenceConfigs:findAll"),
     findActive: () => ipcRenderer.invoke("referenceConfigs:findActive")
   },
+  smtpSettings: {
+    getConfig: () => ipcRenderer.invoke("smtpSettings:getConfig"),
+    saveConfig: (config) => ipcRenderer.invoke("smtpSettings:saveConfig", config),
+    sendTestEmail: (command) => ipcRenderer.invoke("smtpSettings:sendTestEmail", command)
+  },
   notifications: {
     send: (payload) => ipcRenderer.invoke("notifications:send", payload)
+  },
+  correspondenceAuditLog: {
+    append: (event) => ipcRenderer.invoke("correspondenceAuditLog:append", event),
+    findByCorrespondence: (correspondenceId) => ipcRenderer.invoke("correspondenceAuditLog:findByCorrespondence", correspondenceId)
+  },
+  postCaptureWorkflow: {
+    execute: (command) => ipcRenderer.invoke("postCaptureWorkflow:execute", command)
   },
   sequenceStore: {
     next: (key) => ipcRenderer.invoke("sequenceStore:next", key)

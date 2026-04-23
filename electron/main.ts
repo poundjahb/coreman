@@ -1,8 +1,10 @@
 import { app, BrowserWindow, ipcMain } from "electron";
+import fs from "fs";
 import path from "path";
 import { createSqliteHostAdapter } from "../src/platform/adapters/sqlite/SqliteHostAdapter";
 import type { IHostAdapter } from "../src/platform/IHostAdapter";
 import type { Correspondence } from "../src/domain/correspondence";
+import type { CorrespondenceActionDefinition } from "../src/domain/correspondenceAction";
 import type { AppUser, Branch, Department } from "../src/domain/governance";
 import type { CreateCorrespondenceAuditEvent } from "../src/platform/contracts/ICorrespondenceAuditLogRepository";
 import type { NotificationPayload } from "../src/platform/contracts/INotificationService";
@@ -11,6 +13,29 @@ import type { SendTestEmailCommand } from "../src/platform/contracts/ISmtpSettin
 import type { SmtpConfig } from "../src/config/systemConfig";
 
 let adapter: IHostAdapter;
+
+function configureStoragePaths(): void {
+  if (process.platform !== "win32") {
+    return;
+  }
+
+  const localAppData = process.env["LOCALAPPDATA"];
+  if (!localAppData) {
+    return;
+  }
+
+  const baseDir = path.join(localAppData, "Correspondance Management");
+  const userDataDir = path.join(baseDir, "userData");
+  const sessionDataDir = path.join(baseDir, "sessionData");
+
+  fs.mkdirSync(userDataDir, { recursive: true });
+  fs.mkdirSync(sessionDataDir, { recursive: true });
+
+  app.setPath("userData", userDataDir);
+  app.setPath("sessionData", sessionDataDir);
+}
+
+configureStoragePaths();
 
 function createWindow(): void {
   const win = new BrowserWindow({
@@ -74,6 +99,17 @@ function registerIpcHandlers(): void {
   // referenceConfigs
   ipcMain.handle("referenceConfigs:findAll", () => adapter.referenceConfigs.findAll());
   ipcMain.handle("referenceConfigs:findActive", () => adapter.referenceConfigs.findActive());
+
+  // actionDefinitions
+  ipcMain.handle("actionDefinitions:findById", (_e, id: string) =>
+    adapter.actionDefinitions.findById(id)
+  );
+  ipcMain.handle("actionDefinitions:findAll", () => adapter.actionDefinitions.findAll());
+  ipcMain.handle("actionDefinitions:findActive", () => adapter.actionDefinitions.findActive());
+  ipcMain.handle("actionDefinitions:save", (_e, definition: CorrespondenceActionDefinition) =>
+    adapter.actionDefinitions.save(definition)
+  );
+  ipcMain.handle("actionDefinitions:delete", (_e, id: string) => adapter.actionDefinitions.delete(id));
 
   // notifications
   ipcMain.handle("notifications:send", (_e, payload: NotificationPayload) =>

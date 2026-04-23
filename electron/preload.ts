@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer } from "electron";
 import type { Correspondence } from "../src/domain/correspondence";
+import type { CorrespondenceActionDefinition } from "../src/domain/correspondenceAction";
 import type {
   CorrespondenceAuditEvent,
   CreateCorrespondenceAuditEvent
@@ -37,6 +38,17 @@ contextBridge.exposeInMainWorld("electronAPI", {
     findAll: () => ipcRenderer.invoke("departments:findAll"),
     save: (department: import("../src/domain/governance").Department) => ipcRenderer.invoke("departments:save", department),
     delete: (id: string) => ipcRenderer.invoke("departments:delete", id)
+  },
+  actionDefinitions: {
+    findById: (id: string): Promise<CorrespondenceActionDefinition | null> =>
+      ipcRenderer.invoke("actionDefinitions:findById", id),
+    findAll: (): Promise<CorrespondenceActionDefinition[]> =>
+      ipcRenderer.invoke("actionDefinitions:findAll"),
+    findActive: (): Promise<CorrespondenceActionDefinition[]> =>
+      ipcRenderer.invoke("actionDefinitions:findActive"),
+    save: (definition: CorrespondenceActionDefinition) =>
+      ipcRenderer.invoke("actionDefinitions:save", definition),
+    delete: (id: string) => ipcRenderer.invoke("actionDefinitions:delete", id)
   },
   referenceConfigs: {
     findAll: () => ipcRenderer.invoke("referenceConfigs:findAll"),

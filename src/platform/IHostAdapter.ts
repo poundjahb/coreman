@@ -9,6 +9,7 @@ import type { IPostCaptureWorkflowService } from "./contracts/IPostCaptureWorkfl
 import type { IReferenceConfigRepository } from "./contracts/IReferenceConfigRepository";
 import type { ISmtpSettingsService } from "./contracts/ISmtpSettingsService";
 import type { IUserRepository } from "./contracts/IUserRepository";
+import type { ICorrespondenceActionDefinitionRepository } from "./contracts/ICorrespondenceActionDefinitionRepository";
 
 export interface PlatformIndicator {
   target: PlatformTarget;
@@ -22,6 +23,7 @@ export interface IHostAdapter {
   users: IUserRepository;
   branches: IBranchRepository;
   departments: IDepartmentRepository;
+  actionDefinitions: ICorrespondenceActionDefinitionRepository;
   referenceConfigs: IReferenceConfigRepository;
   smtpSettings: ISmtpSettingsService;
   notifications: INotificationService;

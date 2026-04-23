@@ -1,4 +1,5 @@
 import type { Correspondence } from "../../../domain/correspondence";
+import type { CorrespondenceActionDefinition } from "../../../domain/correspondenceAction";
 import type { AppUser, Branch, Department } from "../../../domain/governance";
 import type { ReferenceFormatConfig } from "../../../domain/reference";
 import type {
@@ -39,6 +40,13 @@ export interface ElectronAPI {
     findById(id: string): Promise<Department | null>;
     findAll(): Promise<Department[]>;
     save(department: Department): Promise<void>;
+    delete(id: string): Promise<void>;
+  };
+  actionDefinitions: {
+    findById(id: string): Promise<CorrespondenceActionDefinition | null>;
+    findAll(): Promise<CorrespondenceActionDefinition[]>;
+    findActive(): Promise<CorrespondenceActionDefinition[]>;
+    save(definition: CorrespondenceActionDefinition): Promise<void>;
     delete(id: string): Promise<void>;
   };
   referenceConfigs: {

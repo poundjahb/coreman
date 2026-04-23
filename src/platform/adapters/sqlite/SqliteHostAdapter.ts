@@ -12,6 +12,7 @@ import { buildPlatformIndicator } from "../../platformIndicator";
 import { SqliteCorrespondenceAuditLogRepository } from "./SqliteCorrespondenceAuditLogRepository";
 import { SqlitePostCaptureWorkflowService } from "./SqlitePostCaptureWorkflowService";
 import { SqliteSmtpSettingsService } from "./SqliteSmtpSettingsService";
+import { SqliteCorrespondenceActionDefinitionRepository } from "./SqliteCorrespondenceActionDefinitionRepository";
 
 export const sqliteMainProcessPlatformIndicator = buildPlatformIndicator({
   target: "SQLITE",
@@ -43,6 +44,7 @@ export function createSqliteHostAdapter(
     users: new SqliteUserRepository(db),
     branches: new SqliteBranchRepository(db),
     departments: new SqliteDepartmentRepository(db),
+    actionDefinitions: new SqliteCorrespondenceActionDefinitionRepository(db),
     referenceConfigs: new SqliteReferenceConfigRepository(db),
     smtpSettings,
     notifications,
@@ -89,6 +91,13 @@ export const sqliteHostAdapter: IHostAdapter = (() => {
       delete: () => notReady("delete")
     },
     referenceConfigs: { findAll: () => notReady("findAll"), findActive: () => notReady("findActive") },
+    actionDefinitions: {
+      findById: () => notReady("actionDefinitions.findById"),
+      findAll: () => notReady("actionDefinitions.findAll"),
+      findActive: () => notReady("actionDefinitions.findActive"),
+      save: () => notReady("actionDefinitions.save"),
+      delete: () => notReady("actionDefinitions.delete")
+    },
     smtpSettings: {
       getConfig: () => notReady("smtpSettings.getConfig"),
       saveConfig: () => notReady("smtpSettings.saveConfig"),

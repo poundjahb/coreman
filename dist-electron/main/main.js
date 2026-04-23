@@ -1,11 +1,64 @@
 import { app, BrowserWindow, ipcMain } from "electron";
+import fs from "fs";
 import path from "path";
 import BetterSqlite3 from "better-sqlite3";
 import { randomUUID } from "crypto";
+import nodemailer from "nodemailer";
 import __cjs_mod__ from "node:module";
 const __filename = import.meta.filename;
 const __dirname = import.meta.dirname;
 const require2 = __cjs_mod__.createRequire(import.meta.url);
+const __vite_import_meta_env__ = { "BASE_URL": "/", "DEV": true, "MODE": "development", "PROD": false, "SSR": true, "VITE_PLATFORM_TARGET": "SQLITE" };
+function readEnvValue(key) {
+  if (typeof process !== "undefined") {
+    const processValue = process.env?.[key];
+    if (typeof processValue === "string" && processValue.length > 0) {
+      return processValue;
+    }
+  }
+  if (typeof import.meta !== "undefined") {
+    const env = __vite_import_meta_env__;
+    const viteValue = env?.[`VITE_${key}`];
+    if (typeof viteValue === "string" && viteValue.length > 0) {
+      return viteValue;
+    }
+  }
+  return void 0;
+}
+function parsePort(rawValue, fallback) {
+  if (!rawValue) {
+    return fallback;
+  }
+  const parsed = Number.parseInt(rawValue, 10);
+  if (Number.isNaN(parsed) || parsed <= 0) {
+    return fallback;
+  }
+  return parsed;
+}
+function parseBoolean(rawValue, fallback) {
+  if (!rawValue) {
+    return fallback;
+  }
+  const normalized = rawValue.trim().toLowerCase();
+  if (normalized === "true" || normalized === "1" || normalized === "yes") {
+    return true;
+  }
+  if (normalized === "false" || normalized === "0" || normalized === "no") {
+    return false;
+  }
+  return fallback;
+}
+function getRuntimeSmtpConfig() {
+  return {
+    host: readEnvValue("SMTP_HOST") ?? "127.0.0.1",
+    port: parsePort(readEnvValue("SMTP_PORT"), 1025),
+    secure: parseBoolean(readEnvValue("SMTP_SECURE"), false),
+    user: readEnvValue("SMTP_USER"),
+    pass: readEnvValue("SMTP_PASS"),
+    fromAddress: readEnvValue("SMTP_FROM") ?? "noreply@bank.local",
+    connectionTimeoutMs: parsePort(readEnvValue("SMTP_CONNECTION_TIMEOUT_MS"), 3e3)
+  };
+}
 const ALL_ROLE_CODES = [
   "ADMIN",
   "RECEPTIONIST",
@@ -110,54 +163,114 @@ const demoReferenceConfigs = [
     isActive: true
   }
 ];
+const demoActionDefinitions = [
+  {
+    id: "act-001",
+    code: "FOR_INFORMATION",
+    label: "For Information",
+    description: "Read-only action; no external workflow is triggered.",
+    category: "INFO",
+    requiresOwner: false,
+    triggerMode: "NONE",
+    workflowEnabled: false,
+    workflowMethod: "POST",
+    workflowTimeoutMs: 1e4,
+    authType: "NONE",
+    retryMaxAttempts: 0,
+    retryBackoffMs: 0,
+    defaultSlaDays: 0,
+    isActive: true,
+    createdAt: /* @__PURE__ */ new Date("2026-04-20T08:00:00.000Z"),
+    updatedAt: /* @__PURE__ */ new Date("2026-04-20T08:00:00.000Z")
+  },
+  {
+    id: "act-002",
+    code: "RESPOND_TO",
+    label: "Respond To",
+    description: "Owner-triggered action that calls an HTTP workflow endpoint.",
+    category: "RESPONSE",
+    requiresOwner: true,
+    triggerMode: "OWNER_EXECUTE",
+    workflowEnabled: true,
+    workflowMethod: "POST",
+    workflowEndpointUrl: "https://workflow.local/respond",
+    workflowTimeoutMs: 15e3,
+    authType: "BEARER_TOKEN_REF",
+    authSecretRef: "secrets/workflow/respond-token",
+    payloadTemplate: '{"correspondenceId":"{{correspondence.id}}","actionCode":"{{action.code}}"}',
+    retryMaxAttempts: 2,
+    retryBackoffMs: 2e3,
+    defaultSlaDays: 3,
+    isActive: true,
+    createdAt: /* @__PURE__ */ new Date("2026-04-20T08:00:00.000Z"),
+    updatedAt: /* @__PURE__ */ new Date("2026-04-20T08:00:00.000Z")
+  }
+];
+const seededByReceptionist = demoUsers.find((user) => user.id === "u-001");
+if (!seededByReceptionist) {
+  throw new Error("Seed user u-001 is required for correspondence audit fields.");
+}
 const demoCorrespondences = [
   {
     id: "c-001",
     reference: "BANK-HQ-OPS-202604-000001",
     subject: "Regulatory request for Q1 compliance returns",
     direction: "INCOMING",
+    fromTo: "Central Bank Regulatory Authority",
+    organisation: "Central Bank",
+    correspondenceDate: /* @__PURE__ */ new Date("2026-04-19T00:00:00.000Z"),
     branchId: "b-001",
     departmentId: "d-001",
     registeredById: "u-001",
     recipientId: "u-003",
     actionOwnerId: "u-002",
     status: "IN_PROGRESS",
-    receivedDate: "2026-04-20",
-    dueDate: "2026-04-24",
-    createdAt: "2026-04-20T08:00:00Z",
-    updatedAt: "2026-04-20T08:00:00Z"
+    receivedDate: /* @__PURE__ */ new Date("2026-04-20T00:00:00.000Z"),
+    dueDate: /* @__PURE__ */ new Date("2026-04-24T00:00:00.000Z"),
+    createdAt: /* @__PURE__ */ new Date("2026-04-20T08:00:00.000Z"),
+    updatedAt: /* @__PURE__ */ new Date("2026-04-20T08:00:00.000Z"),
+    createBy: seededByReceptionist,
+    updateBy: seededByReceptionist
   },
   {
     id: "c-002",
     reference: "BANK-HQ-FIN-202604-000014",
     subject: "Treasury confirmation memo",
     direction: "OUTGOING",
+    fromTo: "Ministry of Finance",
+    organisation: "Ministry of Finance",
     branchId: "b-001",
     departmentId: "d-002",
     registeredById: "u-001",
     recipientId: "u-005",
     actionOwnerId: "u-002",
     status: "AWAITING_REVIEW",
-    receivedDate: "2026-04-20",
-    dueDate: "2026-04-23",
-    createdAt: "2026-04-20T09:00:00Z",
-    updatedAt: "2026-04-20T09:00:00Z"
+    receivedDate: /* @__PURE__ */ new Date("2026-04-20T00:00:00.000Z"),
+    dueDate: /* @__PURE__ */ new Date("2026-04-23T00:00:00.000Z"),
+    createdAt: /* @__PURE__ */ new Date("2026-04-20T09:00:00.000Z"),
+    updatedAt: /* @__PURE__ */ new Date("2026-04-20T09:00:00.000Z"),
+    createBy: seededByReceptionist,
+    updateBy: seededByReceptionist
   },
   {
     id: "c-003",
     reference: "BANK-BRN-02-FIN-202604-000102",
     subject: "Branch audit exception follow-up",
     direction: "INCOMING",
+    fromTo: "Internal Audit Division",
+    correspondenceDate: /* @__PURE__ */ new Date("2026-04-17T00:00:00.000Z"),
     branchId: "b-002",
     departmentId: "d-002",
     registeredById: "u-001",
     recipientId: "u-003",
     actionOwnerId: "u-002",
     status: "NEW",
-    receivedDate: "2026-04-18",
-    dueDate: "2026-04-25",
-    createdAt: "2026-04-18T10:00:00Z",
-    updatedAt: "2026-04-18T10:00:00Z"
+    receivedDate: /* @__PURE__ */ new Date("2026-04-18T00:00:00.000Z"),
+    dueDate: /* @__PURE__ */ new Date("2026-04-25T00:00:00.000Z"),
+    createdAt: /* @__PURE__ */ new Date("2026-04-18T10:00:00.000Z"),
+    updatedAt: /* @__PURE__ */ new Date("2026-04-18T10:00:00.000Z"),
+    createBy: seededByReceptionist,
+    updateBy: seededByReceptionist
   }
 ];
 function openDatabase(dbPath) {
@@ -175,6 +288,9 @@ function initSchema(db) {
       reference       TEXT NOT NULL,
       subject         TEXT NOT NULL,
       direction       TEXT NOT NULL,
+      fromTo          TEXT NOT NULL,
+      organisation    TEXT,
+      correspondenceDate TEXT,
       branchId        TEXT NOT NULL,
       departmentId    TEXT,
       registeredById  TEXT NOT NULL,
@@ -184,7 +300,10 @@ function initSchema(db) {
       receivedDate    TEXT NOT NULL,
       dueDate         TEXT,
       createdAt       TEXT NOT NULL,
-      updatedAt       TEXT NOT NULL
+      updatedAt       TEXT NOT NULL,
+      createById      TEXT,
+      updateById      TEXT,
+      summary         TEXT CHECK (summary IS NULL OR length(summary) <= 500)
     );
 
     CREATE TABLE IF NOT EXISTS users (
@@ -237,6 +356,177 @@ function initSchema(db) {
       correspondenceId TEXT,
       sentAt           TEXT NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS correspondence_audit_log (
+      id               TEXT PRIMARY KEY,
+      correspondenceId TEXT NOT NULL,
+      eventType        TEXT NOT NULL,
+      status           TEXT NOT NULL,
+      payloadJson      TEXT,
+      errorMessage     TEXT,
+      createdAt        TEXT NOT NULL,
+      createdById      TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS smtp_settings (
+      id                  INTEGER PRIMARY KEY CHECK (id = 1),
+      host                TEXT NOT NULL,
+      port                INTEGER NOT NULL,
+      secure              INTEGER NOT NULL,
+      user                TEXT,
+      pass                TEXT,
+      fromAddress         TEXT NOT NULL,
+      connectionTimeoutMs INTEGER NOT NULL,
+      updatedAt           TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS correspondence_action_definitions (
+      id                 TEXT PRIMARY KEY,
+      code               TEXT NOT NULL UNIQUE,
+      label              TEXT NOT NULL,
+      description        TEXT,
+      category           TEXT NOT NULL,
+      requiresOwner      INTEGER NOT NULL,
+      triggerMode        TEXT NOT NULL,
+      workflowEnabled    INTEGER NOT NULL,
+      workflowMethod     TEXT NOT NULL,
+      workflowEndpointUrl TEXT,
+      workflowTimeoutMs  INTEGER NOT NULL,
+      authType           TEXT NOT NULL,
+      authSecretRef      TEXT,
+      payloadTemplate    TEXT,
+      retryMaxAttempts   INTEGER NOT NULL,
+      retryBackoffMs     INTEGER NOT NULL,
+      defaultSlaDays     INTEGER,
+      isActive           INTEGER NOT NULL,
+      createdAt          TEXT NOT NULL,
+      updatedAt          TEXT NOT NULL
+    );
+  `);
+  ensureCorrespondenceColumns(db);
+  ensureCorrespondenceUserReferenceTriggers(db);
+}
+function ensureCorrespondenceColumns(db) {
+  const columns = db.prepare("PRAGMA table_info(correspondences)").all();
+  const existing = new Set(columns.map((column) => column.name));
+  if (!existing.has("fromTo")) {
+    db.exec(`ALTER TABLE correspondences ADD COLUMN fromTo TEXT NOT NULL DEFAULT ''`);
+  }
+  if (!existing.has("organisation")) {
+    db.exec(`ALTER TABLE correspondences ADD COLUMN organisation TEXT`);
+  }
+  if (!existing.has("correspondenceDate")) {
+    db.exec(`ALTER TABLE correspondences ADD COLUMN correspondenceDate TEXT`);
+  }
+  if (!existing.has("createById")) {
+    db.exec(`ALTER TABLE correspondences ADD COLUMN createById TEXT`);
+    db.exec(`UPDATE correspondences SET createById = registeredById WHERE createById IS NULL OR createById = ''`);
+  }
+  if (!existing.has("updateById")) {
+    db.exec(`ALTER TABLE correspondences ADD COLUMN updateById TEXT`);
+    db.exec(`UPDATE correspondences SET updateById = registeredById WHERE updateById IS NULL OR updateById = ''`);
+  }
+  if (!existing.has("summary")) {
+    db.exec(`ALTER TABLE correspondences ADD COLUMN summary TEXT`);
+  }
+}
+function ensureCorrespondenceUserReferenceTriggers(db) {
+  db.exec(`
+    CREATE TRIGGER IF NOT EXISTS correspondences_registered_by_fk_insert
+    BEFORE INSERT ON correspondences
+    FOR EACH ROW
+    WHEN (SELECT id FROM users WHERE id = NEW.registeredById) IS NULL
+    BEGIN
+      SELECT RAISE(ABORT, 'registeredById must reference users.id');
+    END;
+
+    CREATE TRIGGER IF NOT EXISTS correspondences_registered_by_fk_update
+    BEFORE UPDATE OF registeredById ON correspondences
+    FOR EACH ROW
+    WHEN (SELECT id FROM users WHERE id = NEW.registeredById) IS NULL
+    BEGIN
+      SELECT RAISE(ABORT, 'registeredById must reference users.id');
+    END;
+
+    CREATE TRIGGER IF NOT EXISTS correspondences_recipient_fk_insert
+    BEFORE INSERT ON correspondences
+    FOR EACH ROW
+    WHEN NEW.recipientId IS NOT NULL AND (SELECT id FROM users WHERE id = NEW.recipientId) IS NULL
+    BEGIN
+      SELECT RAISE(ABORT, 'recipientId must reference users.id');
+    END;
+
+    CREATE TRIGGER IF NOT EXISTS correspondences_recipient_fk_update
+    BEFORE UPDATE OF recipientId ON correspondences
+    FOR EACH ROW
+    WHEN NEW.recipientId IS NOT NULL AND (SELECT id FROM users WHERE id = NEW.recipientId) IS NULL
+    BEGIN
+      SELECT RAISE(ABORT, 'recipientId must reference users.id');
+    END;
+
+    CREATE TRIGGER IF NOT EXISTS correspondences_action_owner_fk_insert
+    BEFORE INSERT ON correspondences
+    FOR EACH ROW
+    WHEN NEW.actionOwnerId IS NOT NULL AND (SELECT id FROM users WHERE id = NEW.actionOwnerId) IS NULL
+    BEGIN
+      SELECT RAISE(ABORT, 'actionOwnerId must reference users.id');
+    END;
+
+    CREATE TRIGGER IF NOT EXISTS correspondences_action_owner_fk_update
+    BEFORE UPDATE OF actionOwnerId ON correspondences
+    FOR EACH ROW
+    WHEN NEW.actionOwnerId IS NOT NULL AND (SELECT id FROM users WHERE id = NEW.actionOwnerId) IS NULL
+    BEGIN
+      SELECT RAISE(ABORT, 'actionOwnerId must reference users.id');
+    END;
+
+    CREATE TRIGGER IF NOT EXISTS correspondences_create_by_fk_insert
+    BEFORE INSERT ON correspondences
+    FOR EACH ROW
+    WHEN NEW.createById IS NULL OR NEW.createById = '' OR (SELECT id FROM users WHERE id = NEW.createById) IS NULL
+    BEGIN
+      SELECT RAISE(ABORT, 'createById must reference users.id');
+    END;
+
+    CREATE TRIGGER IF NOT EXISTS correspondences_create_by_fk_update
+    BEFORE UPDATE OF createById ON correspondences
+    FOR EACH ROW
+    WHEN NEW.createById IS NOT NULL AND NEW.createById != '' AND (SELECT id FROM users WHERE id = NEW.createById) IS NULL
+    BEGIN
+      SELECT RAISE(ABORT, 'createById must reference users.id');
+    END;
+
+    CREATE TRIGGER IF NOT EXISTS correspondences_update_by_fk_insert
+    BEFORE INSERT ON correspondences
+    FOR EACH ROW
+    WHEN NEW.updateById IS NULL OR NEW.updateById = '' OR (SELECT id FROM users WHERE id = NEW.updateById) IS NULL
+    BEGIN
+      SELECT RAISE(ABORT, 'updateById must reference users.id');
+    END;
+
+    CREATE TRIGGER IF NOT EXISTS correspondences_update_by_fk_update
+    BEFORE UPDATE OF updateById ON correspondences
+    FOR EACH ROW
+    WHEN NEW.updateById IS NOT NULL AND NEW.updateById != '' AND (SELECT id FROM users WHERE id = NEW.updateById) IS NULL
+    BEGIN
+      SELECT RAISE(ABORT, 'updateById must reference users.id');
+    END;
+
+    CREATE TRIGGER IF NOT EXISTS correspondences_summary_len_insert
+    BEFORE INSERT ON correspondences
+    FOR EACH ROW
+    WHEN NEW.summary IS NOT NULL AND length(NEW.summary) > 500
+    BEGIN
+      SELECT RAISE(ABORT, 'summary length must be <= 500');
+    END;
+
+    CREATE TRIGGER IF NOT EXISTS correspondences_summary_len_update
+    BEFORE UPDATE OF summary ON correspondences
+    FOR EACH ROW
+    WHEN NEW.summary IS NOT NULL AND length(NEW.summary) > 500
+    BEGIN
+      SELECT RAISE(ABORT, 'summary length must be <= 500');
+    END;
   `);
 }
 function hasRows(db, tableName) {
@@ -298,22 +588,114 @@ function seedDatabase(db) {
   if (!hasRows(db, "correspondences")) {
     const insertCorrespondence = db.prepare(
       `INSERT INTO correspondences
-        (id, reference, subject, direction, branchId, departmentId, registeredById,
-         recipientId, actionOwnerId, status, receivedDate, dueDate, createdAt, updatedAt)
+        (id, reference, subject, direction, fromTo, organisation, correspondenceDate, branchId,
+         departmentId, registeredById, recipientId, actionOwnerId, status, receivedDate,
+         dueDate, createdAt, updatedAt, createById, updateById, summary)
        VALUES
-        (@id, @reference, @subject, @direction, @branchId, @departmentId, @registeredById,
-         @recipientId, @actionOwnerId, @status, @receivedDate, @dueDate, @createdAt, @updatedAt)`
+        (@id, @reference, @subject, @direction, @fromTo, @organisation, @correspondenceDate,
+         @branchId, @departmentId, @registeredById, @recipientId, @actionOwnerId, @status,
+         @receivedDate, @dueDate, @createdAt, @updatedAt, @createById, @updateById, @summary)`
     );
     for (const correspondence of demoCorrespondences) {
       insertCorrespondence.run({
         ...correspondence,
+        organisation: correspondence.organisation ?? null,
+        correspondenceDate: correspondence.correspondenceDate ? correspondence.correspondenceDate.toISOString() : null,
+        receivedDate: correspondence.receivedDate.toISOString(),
+        dueDate: correspondence.dueDate ? correspondence.dueDate.toISOString() : null,
+        createdAt: correspondence.createdAt.toISOString(),
         departmentId: correspondence.departmentId ?? null,
         recipientId: correspondence.recipientId ?? null,
         actionOwnerId: correspondence.actionOwnerId ?? null,
-        dueDate: correspondence.dueDate ?? null
+        updatedAt: correspondence.updatedAt.toISOString(),
+        createById: correspondence.createBy.id,
+        updateById: correspondence.updateBy.id,
+        summary: correspondence.summary ?? null
       });
     }
   }
+  if (!hasRows(db, "correspondence_action_definitions")) {
+    const insertActionDefinition = db.prepare(
+      `INSERT INTO correspondence_action_definitions
+        (id, code, label, description, category, requiresOwner, triggerMode,
+         workflowEnabled, workflowMethod, workflowEndpointUrl, workflowTimeoutMs,
+         authType, authSecretRef, payloadTemplate, retryMaxAttempts, retryBackoffMs,
+         defaultSlaDays, isActive, createdAt, updatedAt)
+       VALUES
+        (@id, @code, @label, @description, @category, @requiresOwner, @triggerMode,
+         @workflowEnabled, @workflowMethod, @workflowEndpointUrl, @workflowTimeoutMs,
+         @authType, @authSecretRef, @payloadTemplate, @retryMaxAttempts, @retryBackoffMs,
+         @defaultSlaDays, @isActive, @createdAt, @updatedAt)`
+    );
+    for (const definition of demoActionDefinitions) {
+      insertActionDefinition.run({
+        ...definition,
+        description: definition.description ?? null,
+        requiresOwner: definition.requiresOwner ? 1 : 0,
+        workflowEnabled: definition.workflowEnabled ? 1 : 0,
+        workflowEndpointUrl: definition.workflowEndpointUrl ?? null,
+        authSecretRef: definition.authSecretRef ?? null,
+        payloadTemplate: definition.payloadTemplate ?? null,
+        defaultSlaDays: definition.defaultSlaDays ?? null,
+        isActive: definition.isActive ? 1 : 0,
+        createdAt: definition.createdAt.toISOString(),
+        updatedAt: definition.updatedAt.toISOString()
+      });
+    }
+  }
+}
+function parseUser(row) {
+  return {
+    id: row.id,
+    employeeCode: row.employeeCode,
+    fullName: row.fullName,
+    email: row.email,
+    branchId: row.branchId,
+    departmentId: row.departmentId,
+    isActive: row.isActive === 1,
+    canLogin: row.canLogin === 1,
+    canOwnActions: row.canOwnActions === 1,
+    roles: JSON.parse(row.roles)
+  };
+}
+function getUserMap(db) {
+  const rows = db.prepare("SELECT * FROM users").all();
+  return new Map(rows.map((row) => {
+    const user = parseUser(row);
+    return [user.id, user];
+  }));
+}
+function resolveAuditUser(userId, fallbackId, usersById) {
+  const resolvedId = userId && userId.length > 0 ? userId : fallbackId;
+  const user = usersById.get(resolvedId);
+  if (!user) {
+    throw new Error(`Audit user '${resolvedId}' was not found.`);
+  }
+  return user;
+}
+function toRow(correspondence) {
+  return {
+    ...correspondence,
+    createById: correspondence.createBy.id,
+    updateById: correspondence.updateBy.id,
+    correspondenceDate: correspondence.correspondenceDate ? correspondence.correspondenceDate.toISOString() : null,
+    receivedDate: correspondence.receivedDate.toISOString(),
+    dueDate: correspondence.dueDate ? correspondence.dueDate.toISOString() : null,
+    createdAt: correspondence.createdAt.toISOString(),
+    updatedAt: correspondence.updatedAt.toISOString()
+  };
+}
+function fromRow(row, usersById) {
+  return {
+    ...row,
+    correspondenceDate: row.correspondenceDate ? new Date(row.correspondenceDate) : void 0,
+    receivedDate: new Date(row.receivedDate),
+    dueDate: row.dueDate ? new Date(row.dueDate) : void 0,
+    createdAt: new Date(row.createdAt),
+    updatedAt: new Date(row.updatedAt),
+    createBy: resolveAuditUser(row.createById, row.registeredById, usersById),
+    updateBy: resolveAuditUser(row.updateById, row.registeredById, usersById)
+  };
 }
 class SqliteCorrespondenceRepository {
   constructor(db) {
@@ -321,27 +703,62 @@ class SqliteCorrespondenceRepository {
   }
   async findById(id) {
     const row = this.db.prepare("SELECT * FROM correspondences WHERE id = ?").get(id);
-    return row ?? null;
+    if (!row) {
+      return null;
+    }
+    const usersById = getUserMap(this.db);
+    return fromRow(row, usersById);
   }
   async findAll() {
-    return this.db.prepare("SELECT * FROM correspondences").all();
+    const rows = this.db.prepare("SELECT * FROM correspondences").all();
+    const usersById = getUserMap(this.db);
+    return rows.map((row) => fromRow(row, usersById));
   }
   async findByBranch(branchId) {
-    return this.db.prepare("SELECT * FROM correspondences WHERE branchId = ?").all(branchId);
+    const rows = this.db.prepare("SELECT * FROM correspondences WHERE branchId = ?").all(branchId);
+    const usersById = getUserMap(this.db);
+    return rows.map((row) => fromRow(row, usersById));
   }
   async save(correspondence) {
+    if (correspondence.summary && correspondence.summary.length > 500) {
+      throw new Error("Summary cannot exceed 500 characters.");
+    }
     this.db.prepare(
       `INSERT OR REPLACE INTO correspondences
-          (id, reference, subject, direction, branchId, departmentId, registeredById,
-           recipientId, actionOwnerId, status, receivedDate, dueDate, createdAt, updatedAt)
+          (id, reference, subject, direction, fromTo, organisation, correspondenceDate, branchId,
+           departmentId, registeredById, recipientId, actionOwnerId, status, receivedDate,
+           dueDate, createdAt, updatedAt, createById, updateById, summary)
          VALUES
-          (@id, @reference, @subject, @direction, @branchId, @departmentId, @registeredById,
-           @recipientId, @actionOwnerId, @status, @receivedDate, @dueDate, @createdAt, @updatedAt)`
-    ).run(correspondence);
+          (@id, @reference, @subject, @direction, @fromTo, @organisation, @correspondenceDate,
+           @branchId, @departmentId, @registeredById, @recipientId, @actionOwnerId, @status,
+           @receivedDate, @dueDate, @createdAt, @updatedAt, @createById, @updateById, @summary)`
+    ).run(toRow(correspondence));
   }
   async update(id, changes) {
-    const sets = Object.keys(changes).map((k) => `${k} = @${k}`).join(", ");
-    this.db.prepare(`UPDATE correspondences SET ${sets} WHERE id = @id`).run({ ...changes, id });
+    if (changes.summary && changes.summary.length > 500) {
+      throw new Error("Summary cannot exceed 500 characters.");
+    }
+    const existing = await this.findById(id);
+    if (!existing) {
+      return;
+    }
+    const { createBy, updateBy, ...restChanges } = changes;
+    const effectiveUpdateBy = updateBy ?? existing.updateBy;
+    const updatePayload = {
+      ...restChanges,
+      createById: createBy ? createBy.id : void 0,
+      updateById: effectiveUpdateBy.id,
+      correspondenceDate: changes.correspondenceDate ? changes.correspondenceDate.toISOString() : changes.correspondenceDate === void 0 ? void 0 : null,
+      receivedDate: changes.receivedDate ? changes.receivedDate.toISOString() : void 0,
+      dueDate: changes.dueDate ? changes.dueDate.toISOString() : changes.dueDate === void 0 ? void 0 : null,
+      createdAt: changes.createdAt ? changes.createdAt.toISOString() : void 0,
+      updatedAt: (/* @__PURE__ */ new Date()).toISOString()
+    };
+    const sets = Object.keys(updatePayload).filter((k) => updatePayload[k] !== void 0).map((k) => `${k} = @${k}`).join(", ");
+    if (!sets) {
+      return;
+    }
+    this.db.prepare(`UPDATE correspondences SET ${sets} WHERE id = @id`).run({ ...updatePayload, id });
   }
 }
 function rowToUser(row) {
@@ -441,7 +858,7 @@ class SqliteDepartmentRepository {
     this.db.prepare("DELETE FROM departments WHERE id = ?").run(id);
   }
 }
-function rowToConfig(row) {
+function rowToConfig$1(row) {
   return { ...row, isActive: Boolean(row["isActive"]) };
 }
 class SqliteReferenceConfigRepository {
@@ -449,15 +866,42 @@ class SqliteReferenceConfigRepository {
     this.db = db;
   }
   async findAll() {
-    return this.db.prepare("SELECT * FROM reference_configs").all().map(rowToConfig);
+    return this.db.prepare("SELECT * FROM reference_configs").all().map(rowToConfig$1);
   }
   async findActive() {
-    return this.db.prepare("SELECT * FROM reference_configs WHERE isActive = 1").all().map(rowToConfig);
+    return this.db.prepare("SELECT * FROM reference_configs WHERE isActive = 1").all().map(rowToConfig$1);
+  }
+}
+class NodemailerSqliteMailer {
+  constructor(config) {
+    this.config = config;
+    this.transport = nodemailer.createTransport({
+      host: config.host,
+      port: config.port,
+      secure: config.secure,
+      auth: config.user && config.pass ? {
+        user: config.user,
+        pass: config.pass
+      } : void 0,
+      connectionTimeout: config.connectionTimeoutMs,
+      greetingTimeout: config.connectionTimeoutMs,
+      socketTimeout: config.connectionTimeoutMs
+    });
+  }
+  transport;
+  async send(message) {
+    await this.transport.sendMail({
+      from: this.config.fromAddress,
+      to: message.to,
+      subject: message.subject,
+      text: message.text
+    });
   }
 }
 class SqliteNotificationService {
-  constructor(db) {
+  constructor(db, smtpSettingsService) {
     this.db = db;
+    this.smtpSettingsService = smtpSettingsService;
   }
   async send(payload) {
     this.db.prepare(
@@ -470,6 +914,18 @@ class SqliteNotificationService {
       body: payload.body,
       correspondenceId: payload.correspondenceId ?? null,
       sentAt: (/* @__PURE__ */ new Date()).toISOString()
+    });
+    const row = this.db.prepare("SELECT email FROM users WHERE id = ?").get(payload.recipientId);
+    const recipientEmail = row?.email;
+    if (!recipientEmail) {
+      return;
+    }
+    const config = await this.smtpSettingsService.getConfig();
+    const mailer = new NodemailerSqliteMailer(config);
+    await mailer.send({
+      to: recipientEmail,
+      subject: payload.subject,
+      text: payload.body
     });
   }
 }
@@ -500,26 +956,288 @@ function buildPlatformIndicator(input) {
     iconDataUrl: "data:image/svg+xml," + encodeURIComponent(svg)
   };
 }
+function toEvent(row) {
+  return {
+    id: row.id,
+    correspondenceId: row.correspondenceId,
+    eventType: row.eventType,
+    status: row.status,
+    payloadJson: row.payloadJson ?? void 0,
+    errorMessage: row.errorMessage ?? void 0,
+    createdAt: new Date(row.createdAt),
+    createdById: row.createdById
+  };
+}
+class SqliteCorrespondenceAuditLogRepository {
+  constructor(db) {
+    this.db = db;
+  }
+  async append(event) {
+    const createdAtIso = (/* @__PURE__ */ new Date()).toISOString();
+    const id = randomUUID();
+    this.db.prepare(
+      `INSERT INTO correspondence_audit_log
+       (id, correspondenceId, eventType, status, payloadJson, errorMessage, createdAt, createdById)
+       VALUES
+       (@id, @correspondenceId, @eventType, @status, @payloadJson, @errorMessage, @createdAt, @createdById)`
+    ).run({
+      id,
+      correspondenceId: event.correspondenceId,
+      eventType: event.eventType,
+      status: event.status,
+      payloadJson: event.payloadJson ?? null,
+      errorMessage: event.errorMessage ?? null,
+      createdAt: createdAtIso,
+      createdById: event.createdById
+    });
+    return {
+      id,
+      correspondenceId: event.correspondenceId,
+      eventType: event.eventType,
+      status: event.status,
+      payloadJson: event.payloadJson,
+      errorMessage: event.errorMessage,
+      createdAt: new Date(createdAtIso),
+      createdById: event.createdById
+    };
+  }
+  async findByCorrespondence(correspondenceId) {
+    const rows = this.db.prepare(
+      `SELECT id, correspondenceId, eventType, status, payloadJson, errorMessage, createdAt, createdById
+       FROM correspondence_audit_log
+       WHERE correspondenceId = ?
+       ORDER BY createdAt ASC`
+    ).all(correspondenceId);
+    return rows.map(toEvent);
+  }
+}
+class SqlitePostCaptureWorkflowService {
+  constructor(notifications, auditLog) {
+    this.notifications = notifications;
+    this.auditLog = auditLog;
+  }
+  async execute(command) {
+    const recipientId = this.resolveRecipientId(command);
+    const subject = `Correspondence ${command.correspondence.reference} received`;
+    const body = [
+      "A new correspondence has been captured and assigned.",
+      `Reference: ${command.correspondence.reference}`,
+      `Subject: ${command.correspondence.subject}`
+    ].join("\n");
+    await this.notifications.send({
+      recipientId,
+      subject,
+      body,
+      correspondenceId: command.correspondence.id
+    });
+    await this.auditLog.append({
+      correspondenceId: command.correspondence.id,
+      eventType: "NOTIFICATION_SENT",
+      status: "SUCCESS",
+      payloadJson: JSON.stringify({ mode: command.mode, recipientId, subject }),
+      createdById: command.actor.id
+    });
+  }
+  resolveRecipientId(command) {
+    return command.correspondence.recipientId ?? command.correspondence.actionOwnerId ?? command.actor.id;
+  }
+}
+function rowToConfig(row) {
+  return {
+    host: row.host,
+    port: row.port,
+    secure: row.secure === 1,
+    user: row.user ?? void 0,
+    pass: row.pass ?? void 0,
+    fromAddress: row.fromAddress,
+    connectionTimeoutMs: row.connectionTimeoutMs
+  };
+}
+class SqliteSmtpSettingsService {
+  constructor(db, fallbackConfig = getRuntimeSmtpConfig()) {
+    this.db = db;
+    this.fallbackConfig = fallbackConfig;
+  }
+  async getConfig() {
+    const row = this.db.prepare(
+      `SELECT host, port, secure, user, pass, fromAddress, connectionTimeoutMs
+         FROM smtp_settings
+         WHERE id = 1`
+    ).get();
+    if (!row) {
+      return { ...this.fallbackConfig };
+    }
+    return rowToConfig(row);
+  }
+  async saveConfig(config) {
+    this.db.prepare(
+      `INSERT INTO smtp_settings
+          (id, host, port, secure, user, pass, fromAddress, connectionTimeoutMs, updatedAt)
+         VALUES
+          (1, @host, @port, @secure, @user, @pass, @fromAddress, @connectionTimeoutMs, @updatedAt)
+         ON CONFLICT(id)
+         DO UPDATE SET
+           host = excluded.host,
+           port = excluded.port,
+           secure = excluded.secure,
+           user = excluded.user,
+           pass = excluded.pass,
+           fromAddress = excluded.fromAddress,
+           connectionTimeoutMs = excluded.connectionTimeoutMs,
+           updatedAt = excluded.updatedAt`
+    ).run({
+      host: config.host,
+      port: config.port,
+      secure: config.secure ? 1 : 0,
+      user: config.user ?? null,
+      pass: config.pass ?? null,
+      fromAddress: config.fromAddress,
+      connectionTimeoutMs: config.connectionTimeoutMs,
+      updatedAt: (/* @__PURE__ */ new Date()).toISOString()
+    });
+  }
+  async sendTestEmail(command) {
+    const subject = command.subject ?? "SMTP Test Email";
+    const body = command.body ?? "SMTP configuration test completed successfully.";
+    await new NodemailerSqliteMailer(command.config).send({
+      to: command.to,
+      subject,
+      text: body
+    });
+  }
+}
+function rowToDefinition(row) {
+  return {
+    id: row["id"],
+    code: row["code"],
+    label: row["label"],
+    description: row["description"] ?? void 0,
+    category: row["category"],
+    requiresOwner: Boolean(row["requiresOwner"]),
+    triggerMode: row["triggerMode"],
+    workflowEnabled: Boolean(row["workflowEnabled"]),
+    workflowMethod: row["workflowMethod"],
+    workflowEndpointUrl: row["workflowEndpointUrl"] ?? void 0,
+    workflowTimeoutMs: Number(row["workflowTimeoutMs"]),
+    authType: row["authType"],
+    authSecretRef: row["authSecretRef"] ?? void 0,
+    payloadTemplate: row["payloadTemplate"] ?? void 0,
+    retryMaxAttempts: Number(row["retryMaxAttempts"]),
+    retryBackoffMs: Number(row["retryBackoffMs"]),
+    defaultSlaDays: row["defaultSlaDays"] === null ? void 0 : Number(row["defaultSlaDays"]),
+    isActive: Boolean(row["isActive"]),
+    createdAt: new Date(row["createdAt"]),
+    updatedAt: new Date(row["updatedAt"])
+  };
+}
+class SqliteCorrespondenceActionDefinitionRepository {
+  constructor(db) {
+    this.db = db;
+  }
+  async findById(id) {
+    const row = this.db.prepare("SELECT * FROM correspondence_action_definitions WHERE id = ?").get(id);
+    return row ? rowToDefinition(row) : null;
+  }
+  async findAll() {
+    return this.db.prepare("SELECT * FROM correspondence_action_definitions ORDER BY code").all().map(rowToDefinition);
+  }
+  async findActive() {
+    return this.db.prepare("SELECT * FROM correspondence_action_definitions WHERE isActive = 1 ORDER BY code").all().map(rowToDefinition);
+  }
+  async save(definition) {
+    this.db.prepare(
+      `INSERT INTO correspondence_action_definitions (
+          id, code, label, description, category, requiresOwner, triggerMode,
+          workflowEnabled, workflowMethod, workflowEndpointUrl, workflowTimeoutMs,
+          authType, authSecretRef, payloadTemplate, retryMaxAttempts, retryBackoffMs,
+          defaultSlaDays, isActive, createdAt, updatedAt
+        ) VALUES (
+          @id, @code, @label, @description, @category, @requiresOwner, @triggerMode,
+          @workflowEnabled, @workflowMethod, @workflowEndpointUrl, @workflowTimeoutMs,
+          @authType, @authSecretRef, @payloadTemplate, @retryMaxAttempts, @retryBackoffMs,
+          @defaultSlaDays, @isActive, @createdAt, @updatedAt
+        )
+        ON CONFLICT(id) DO UPDATE SET
+          code = excluded.code,
+          label = excluded.label,
+          description = excluded.description,
+          category = excluded.category,
+          requiresOwner = excluded.requiresOwner,
+          triggerMode = excluded.triggerMode,
+          workflowEnabled = excluded.workflowEnabled,
+          workflowMethod = excluded.workflowMethod,
+          workflowEndpointUrl = excluded.workflowEndpointUrl,
+          workflowTimeoutMs = excluded.workflowTimeoutMs,
+          authType = excluded.authType,
+          authSecretRef = excluded.authSecretRef,
+          payloadTemplate = excluded.payloadTemplate,
+          retryMaxAttempts = excluded.retryMaxAttempts,
+          retryBackoffMs = excluded.retryBackoffMs,
+          defaultSlaDays = excluded.defaultSlaDays,
+          isActive = excluded.isActive,
+          updatedAt = excluded.updatedAt`
+    ).run({
+      ...definition,
+      description: definition.description ?? null,
+      requiresOwner: definition.requiresOwner ? 1 : 0,
+      workflowEnabled: definition.workflowEnabled ? 1 : 0,
+      workflowEndpointUrl: definition.workflowEndpointUrl ?? null,
+      authSecretRef: definition.authSecretRef ?? null,
+      payloadTemplate: definition.payloadTemplate ?? null,
+      defaultSlaDays: definition.defaultSlaDays ?? null,
+      isActive: definition.isActive ? 1 : 0,
+      createdAt: definition.createdAt.toISOString(),
+      updatedAt: definition.updatedAt.toISOString()
+    });
+  }
+  async delete(id) {
+    this.db.prepare("DELETE FROM correspondence_action_definitions WHERE id = ?").run(id);
+  }
+}
 const sqliteMainProcessPlatformIndicator = buildPlatformIndicator({
   target: "SQLITE",
   label: "SQLite (Main)",
   initials: "SQ",
   backgroundColor: "#5742d6"
 });
-function createSqliteHostAdapter(dbPath) {
+function createSqliteHostAdapter(dbPath, options = {}) {
   const db = openDatabase(dbPath);
+  const smtpSettings = new SqliteSmtpSettingsService(db, options.smtpConfig ?? getRuntimeSmtpConfig());
+  const notifications = new SqliteNotificationService(db, smtpSettings);
+  const correspondenceAuditLog = new SqliteCorrespondenceAuditLogRepository(db);
   return {
     platform: sqliteMainProcessPlatformIndicator,
     correspondences: new SqliteCorrespondenceRepository(db),
     users: new SqliteUserRepository(db),
     branches: new SqliteBranchRepository(db),
     departments: new SqliteDepartmentRepository(db),
+    actionDefinitions: new SqliteCorrespondenceActionDefinitionRepository(db),
     referenceConfigs: new SqliteReferenceConfigRepository(db),
-    notifications: new SqliteNotificationService(db),
+    smtpSettings,
+    notifications,
+    correspondenceAuditLog,
+    postCaptureWorkflow: new SqlitePostCaptureWorkflowService(notifications, correspondenceAuditLog),
     sequenceStore: new SqliteSequenceStore(db)
   };
 }
 let adapter;
+function configureStoragePaths() {
+  if (process.platform !== "win32") {
+    return;
+  }
+  const localAppData = process.env["LOCALAPPDATA"];
+  if (!localAppData) {
+    return;
+  }
+  const baseDir = path.join(localAppData, "Correspondance Management");
+  const userDataDir = path.join(baseDir, "userData");
+  const sessionDataDir = path.join(baseDir, "sessionData");
+  fs.mkdirSync(userDataDir, { recursive: true });
+  fs.mkdirSync(sessionDataDir, { recursive: true });
+  app.setPath("userData", userDataDir);
+  app.setPath("sessionData", sessionDataDir);
+}
+configureStoragePaths();
 function createWindow() {
   const win = new BrowserWindow({
     width: 1280,
@@ -576,8 +1294,40 @@ function registerIpcHandlers() {
   ipcMain.handle("referenceConfigs:findAll", () => adapter.referenceConfigs.findAll());
   ipcMain.handle("referenceConfigs:findActive", () => adapter.referenceConfigs.findActive());
   ipcMain.handle(
+    "actionDefinitions:findById",
+    (_e, id) => adapter.actionDefinitions.findById(id)
+  );
+  ipcMain.handle("actionDefinitions:findAll", () => adapter.actionDefinitions.findAll());
+  ipcMain.handle("actionDefinitions:findActive", () => adapter.actionDefinitions.findActive());
+  ipcMain.handle(
+    "actionDefinitions:save",
+    (_e, definition) => adapter.actionDefinitions.save(definition)
+  );
+  ipcMain.handle("actionDefinitions:delete", (_e, id) => adapter.actionDefinitions.delete(id));
+  ipcMain.handle(
     "notifications:send",
     (_e, payload) => adapter.notifications.send(payload)
+  );
+  ipcMain.handle("smtpSettings:getConfig", () => adapter.smtpSettings.getConfig());
+  ipcMain.handle(
+    "smtpSettings:saveConfig",
+    (_e, config) => adapter.smtpSettings.saveConfig(config)
+  );
+  ipcMain.handle(
+    "smtpSettings:sendTestEmail",
+    (_e, command) => adapter.smtpSettings.sendTestEmail(command)
+  );
+  ipcMain.handle(
+    "correspondenceAuditLog:append",
+    (_e, event) => adapter.correspondenceAuditLog.append(event)
+  );
+  ipcMain.handle(
+    "correspondenceAuditLog:findByCorrespondence",
+    (_e, correspondenceId) => adapter.correspondenceAuditLog.findByCorrespondence(correspondenceId)
+  );
+  ipcMain.handle(
+    "postCaptureWorkflow:execute",
+    (_e, command) => adapter.postCaptureWorkflow.execute(command)
   );
   ipcMain.handle(
     "sequenceStore:next",

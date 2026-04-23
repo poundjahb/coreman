@@ -1,40 +1,31 @@
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import {
   AppShell,
   Avatar,
   Box,
-  Button,
   Burger,
-  Collapse,
   Divider,
   Group,
-  Kbd,
-  NavLink,
-  ScrollArea,
+  Menu,
   Select,
   Stack,
   Text,
-  Title
+  Title,
+  UnstyledButton
 } from "@mantine/core";
 import {
   Activity,
   ChartColumnBig,
   ClipboardCheck,
-  Clock3,
   FileSearch,
-  FolderGit2,
-  Gauge,
-  HandCoins,
   History,
   LayoutDashboard,
-  ListChecks,
+  ChevronRight,
   Search,
   Settings,
-  ShieldCheck,
   UserCog,
   Users,
-  Building2,
-  Wrench
+  Building2
 } from "lucide-react";
 import { Navigate, NavLink as RouterNavLink, Route, Routes, useLocation } from "react-router-dom";
 import type { AppUser, RoleCode } from "./domain/governance";
@@ -59,21 +50,20 @@ import {
   AdminFlowAgentsPage,
   AdminHealthPage,
   AdminPerformancePage,
-  AdminSystemControlPage,
+  AdminReferenceDataPage,
+  AdminSystemControlTabPage,
   AdminUsersPage
 } from "./ui/screens/admin/AdminPages";
 
-interface NavItem {
+interface RoleMenuItem {
   label: string;
   to: string;
-  roles?: RoleCode[];
   icon: JSX.Element;
-  shortcut?: string;
 }
 
-interface NavSection {
+interface RoleMenuSection {
   title: string;
-  items: NavItem[];
+  items: RoleMenuItem[];
 }
 
 function hasAnyRole(user: AppUser, roles: RoleCode[]): boolean {
@@ -98,114 +88,64 @@ function ProtectedRoute(props: {
   return children;
 }
 
-const navSections: NavSection[] = [
-  {
-    title: "Reception",
-    items: [
-      {
-        label: "Receptionist Dashboard",
-        to: "/receptionist/dashboard",
-        roles: ["RECEPTIONIST", "ADMIN"],
-        icon: <LayoutDashboard size={16} />,
-        shortcut: "1"
-      },
-      {
-        label: "Receptionist History",
-        to: "/receptionist/history",
-        roles: ["RECEPTIONIST", "ADMIN"],
-        icon: <History size={16} />,
-        shortcut: "2"
-      }
-    ]
-  },
-  {
-    title: "Workflows",
-    items: [
-      {
-        label: "Recipient/Owner Dashboard",
-        to: "/work/dashboard",
-        roles: ["RECIPIENT", "ACTION_OWNER", "ADMIN"],
-        icon: <ClipboardCheck size={16} />,
-        shortcut: "3"
-      },
-      {
-        label: "Task Assignation",
-        to: "/tasks/assign",
-        roles: ["RECIPIENT", "ACTION_OWNER", "ADMIN"],
-        icon: <ListChecks size={16} />
-      },
-      {
-        label: "Take Action",
-        to: "/tasks/action",
-        roles: ["RECIPIENT", "ACTION_OWNER", "ADMIN"],
-        icon: <Clock3 size={16} />
-      }
-    ]
-  },
-  {
-    title: "Administration",
-    items: [
-      { label: "Admin - Users", to: "/admin/users", roles: ["ADMIN"], icon: <Users size={16} /> },
-      {
-        label: "Admin - Branches",
-        to: "/admin/branches",
-        roles: ["ADMIN"],
-        icon: <Building2 size={16} />
-      },
-      {
-        label: "Admin - Departments",
-        to: "/admin/departments",
-        roles: ["ADMIN"],
-        icon: <Building2 size={16} />
-      },
-      { label: "Admin - Actions", to: "/admin/actions", roles: ["ADMIN"], icon: <Wrench size={16} /> },
-      {
-        label: "Admin - System Control",
-        to: "/admin/system",
-        roles: ["ADMIN"],
-        icon: <Settings size={16} />
-      },
-      {
-        label: "Admin - Flows and Agents",
-        to: "/admin/flow",
-        roles: ["ADMIN"],
-        icon: <FolderGit2 size={16} />
-      },
-      { label: "Admin - Audit Logs", to: "/admin/audit", roles: ["ADMIN"], icon: <ShieldCheck size={16} /> },
-      { label: "Admin - Health", to: "/admin/health", roles: ["ADMIN"], icon: <Activity size={16} /> },
-      {
-        label: "Admin - Performance",
-        to: "/admin/performance",
-        roles: ["ADMIN"],
-        icon: <Gauge size={16} />
-      }
-    ]
-  },
-  {
-    title: "Executive",
-    items: [
-      {
-        label: "General Dashboard",
-        to: "/general-dashboard",
-        roles: ["DASHBOARD_VIEWER", "ADMIN"],
-        icon: <ChartColumnBig size={16} />,
-        shortcut: "G"
-      },
-      {
-        label: "Correspondence Search",
-        to: "/search",
-        roles: ["ADMIN", "RECEPTIONIST", "RECIPIENT", "ACTION_OWNER", "COPIED_VIEWER", "DASHBOARD_VIEWER"],
-        icon: <FileSearch size={16} />,
-        shortcut: "K"
-      }
-    ]
+function getRoleMenuSections(currentUser: AppUser): RoleMenuSection[] {
+  const sections: RoleMenuSection[] = [];
+
+  if (hasRole(currentUser, "RECEPTIONIST")) {
+    sections.push({
+      title: "Receptionist",
+      items: [
+        { label: "Dashboard", to: "/receptionist/dashboard", icon: <LayoutDashboard size={16} /> },
+        { label: "History", to: "/receptionist/history", icon: <History size={16} /> }
+      ]
+    });
   }
-];
+
+  if (hasRole(currentUser, "ADMIN")) {
+    sections.push({
+      title: "Admin",
+      items: [
+        { label: "User", to: "/admin/users", icon: <Users size={16} /> },
+        { label: "Reference Data", to: "/admin/reference", icon: <Building2 size={16} /> },
+        { label: "System Control", to: "/admin/system", icon: <Settings size={16} /> },
+        { label: "System Health", to: "/admin/health", icon: <Activity size={16} /> }
+      ]
+    });
+  }
+
+  if (hasRole(currentUser, "DASHBOARD_VIEWER")) {
+    sections.push({
+      title: "Executive",
+      items: [
+        { label: "General Dashboard", to: "/general-dashboard", icon: <ChartColumnBig size={16} /> }
+      ]
+    });
+  }
+
+  if (hasRole(currentUser, "RECIPIENT") || hasRole(currentUser, "ACTION_OWNER")) {
+    sections.push({
+      title: "Recipient / Action Owner",
+      items: [
+        { label: "Action Dashboard", to: "/work/dashboard", icon: <ClipboardCheck size={16} /> }
+      ]
+    });
+  }
+
+  if (!hasRole(currentUser, "RECEPTIONIST")) {
+    sections.push({
+      title: "Search",
+      items: [
+        { label: "Search Correspondence", to: "/search", icon: <FileSearch size={16} /> }
+      ]
+    });
+  }
+
+  return sections;
+}
 
 export function App(): JSX.Element {
   const [navbarCollapsed, setNavbarCollapsed] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-  const [menuOpened, setMenuOpened] = useState(true);
   const [availableUsers, setAvailableUsers] = useState<AppUser[]>([]);
   const [usersError, setUsersError] = useState<string | null>(null);
   const location = useLocation();
@@ -254,6 +194,11 @@ export function App(): JSX.Element {
   const currentUser = useMemo(
     () => availableUsers.find((user) => user.id === currentUserId) ?? availableUsers[0] ?? null,
     [availableUsers, currentUserId]
+  );
+
+  const roleMenuSections = useMemo(
+    () => (currentUser ? getRoleMenuSections(currentUser) : []),
+    [currentUser]
   );
 
   async function refreshUsers(): Promise<void> {
@@ -313,100 +258,62 @@ export function App(): JSX.Element {
               />
             </Group>
 
-            <Group wrap="nowrap" align="center">
-              <Avatar color="blue" radius="xl" size={navbarCollapsed ? "sm" : "md"}>
-                {currentUser.fullName
-                  .split(" ")
-                  .map((part) => part[0])
-                  .join("")
-                  .slice(0, 2)
-                  .toUpperCase()}
-              </Avatar>
-              {!navbarCollapsed && (
-                <div>
-                  <Text size="sm" fw={600}>{currentUser.fullName}</Text>
-                  <Text size="xs" c="dimmed">{currentUser.roles.join(", ")}</Text>
-                </div>
-              )}
-            </Group>
+            <Menu position="bottom-start" withArrow shadow="md" width={280} withinPortal>
+              <Menu.Target>
+                <UnstyledButton
+                  style={{
+                    width: "100%",
+                    borderRadius: 10,
+                    padding: "8px 10px",
+                    border: "1px solid var(--mantine-color-gray-3)"
+                  }}
+                >
+                  <Group justify="space-between" wrap="nowrap">
+                    <Group gap="sm" wrap="nowrap">
+                      <Avatar color="blue" radius="xl" size={navbarCollapsed ? "sm" : "md"}>
+                        {currentUser.fullName
+                          .split(" ")
+                          .map((part) => part[0])
+                          .join("")
+                          .slice(0, 2)
+                          .toUpperCase()}
+                      </Avatar>
+                      {!navbarCollapsed && (
+                        <div>
+                          <Text size="sm" fw={600}>{currentUser.fullName}</Text>
+                          <Text size="xs" c="dimmed">Open navigation menu</Text>
+                        </div>
+                      )}
+                    </Group>
+                    {!navbarCollapsed && <ChevronRight size={16} />}
+                  </Group>
+                </UnstyledButton>
+              </Menu.Target>
+
+              <Menu.Dropdown>
+                {roleMenuSections.map((section, sectionIndex) => (
+                  <Fragment key={section.title}>
+                    <Menu.Label>{section.title}</Menu.Label>
+                    {section.items.map((item) => (
+                      <Menu.Item
+                        key={item.to}
+                        component={RouterNavLink}
+                        to={item.to}
+                        leftSection={item.icon}
+                      >
+                        {item.label}
+                      </Menu.Item>
+                    ))}
+                    {sectionIndex < roleMenuSections.length - 1 && <Menu.Divider />}
+                  </Fragment>
+                ))}
+              </Menu.Dropdown>
+            </Menu>
 
             <Divider />
           </Stack>
 
-          <ScrollArea offsetScrollbars className="navbar-content-scroll">
-            {navbarCollapsed ? (
-              <Stack gap={6} align="stretch">
-                {navSections.flatMap((section) => section.items).map((item) => {
-                  const canAccess = !item.roles || hasAnyRole(currentUser, item.roles);
-                  const active =
-                    location.pathname === item.to || location.pathname.startsWith(`${item.to}/`);
-
-                  return (
-                    <NavLink
-                      key={item.to}
-                      component={RouterNavLink}
-                      to={item.to}
-                      active={active}
-                      disabled={!canAccess}
-                      leftSection={item.icon}
-                      label=""
-                      style={{ borderRadius: 8 }}
-                    />
-                  );
-                })}
-              </Stack>
-            ) : (
-              <Stack gap="sm">
-                <Button
-                  onClick={() => setMenuOpened((current) => !current)}
-                  variant="light"
-                  fullWidth
-                  radius="md"
-                  leftSection={<HandCoins size={16} />}
-                >
-                  Toggle menu
-                </Button>
-
-                <Collapse in={menuOpened} transitionDuration={180}>
-                  <Stack className="sidebar-menu-panel" gap="xs">
-                    {navSections.map((section, index) => (
-                      <Box key={section.title} className="menu-section-reveal" style={{ animationDelay: `${index * 45}ms` }}>
-                        <Text className="sidebar-menu-title">{section.title}</Text>
-                        <Stack gap={2}>
-                          {section.items.map((item) => {
-                            const canAccess = !item.roles || hasAnyRole(currentUser, item.roles);
-                            const active =
-                              location.pathname === item.to || location.pathname.startsWith(`${item.to}/`);
-
-                            return (
-                              <NavLink
-                                key={item.to}
-                                component={RouterNavLink}
-                                to={item.to}
-                                label={item.label}
-                                leftSection={item.icon}
-                                rightSection={
-                                  active && item.shortcut ? (
-                                    <Kbd size="xs">{item.shortcut}</Kbd>
-                                  ) : null
-                                }
-                                active={active}
-                                disabled={!canAccess}
-                                className="menu-link-motion"
-                                variant="subtle"
-                                style={{ borderRadius: 8, paddingInline: 8, paddingBlock: 4 }}
-                              />
-                            );
-                          })}
-                        </Stack>
-                        {index < navSections.length - 1 && <Divider my="xs" />}
-                      </Box>
-                    ))}
-                  </Stack>
-                </Collapse>
-              </Stack>
-            )}
-          </ScrollArea>
+          <Box style={{ flex: 1 }} />
 
           <Stack gap="xs">
             {!navbarCollapsed && (
@@ -415,7 +322,7 @@ export function App(): JSX.Element {
                 onChange={(value) => setCurrentUserId(value)}
                 data={availableUsers.map((user) => ({
                   value: user.id,
-                  label: `${user.fullName} (${user.roles.join(", ")})`
+                  label: user.fullName
                 }))}
                 size="xs"
                 leftSection={<UserCog size={14} />}
@@ -490,6 +397,14 @@ export function App(): JSX.Element {
             }
           />
           <Route
+            path="/admin/reference"
+            element={
+              <ProtectedRoute currentUser={currentUser} requiredRoles={["ADMIN"]}>
+                <AdminReferenceDataPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/admin/branches"
             element={
               <ProtectedRoute currentUser={currentUser} requiredRoles={["ADMIN"]}>
@@ -517,7 +432,7 @@ export function App(): JSX.Element {
             path="/admin/system"
             element={
               <ProtectedRoute currentUser={currentUser} requiredRoles={["ADMIN"]}>
-                <AdminSystemControlPage />
+                <AdminSystemControlTabPage />
               </ProtectedRoute>
             }
           />
@@ -567,7 +482,7 @@ export function App(): JSX.Element {
             element={
               <ProtectedRoute
                 currentUser={currentUser}
-                requiredRoles={["ADMIN", "RECEPTIONIST", "RECIPIENT", "ACTION_OWNER", "COPIED_VIEWER", "DASHBOARD_VIEWER"]}
+                requiredRoles={["ADMIN", "RECIPIENT", "ACTION_OWNER", "COPIED_VIEWER", "DASHBOARD_VIEWER"]}
               >
                 <CorrespondenceSearchPage />
               </ProtectedRoute>

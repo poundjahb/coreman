@@ -9,6 +9,7 @@ import type { ICorrespondenceAuditLogRepository } from "../../contracts/ICorresp
 import type { IPostCaptureWorkflowService } from "../../contracts/IPostCaptureWorkflowService";
 import type { ISmtpSettingsService } from "../../contracts/ISmtpSettingsService";
 import type { SequenceStore } from "../../../domain/reference";
+import type { ICorrespondenceActionDefinitionRepository } from "../../contracts/ICorrespondenceActionDefinitionRepository";
 import { buildPlatformIndicator } from "../../platformIndicator";
 
 export const dataversePlatformIndicator = buildPlatformIndicator({
@@ -57,6 +58,14 @@ const dataverseReferenceConfigRepository: IReferenceConfigRepository = {
   findActive: () => notImplemented("referenceConfigs.findActive")
 };
 
+const dataverseActionDefinitionRepository: ICorrespondenceActionDefinitionRepository = {
+  findById: (_id) => notImplemented("actionDefinitions.findById"),
+  findAll: () => notImplemented("actionDefinitions.findAll"),
+  findActive: () => notImplemented("actionDefinitions.findActive"),
+  save: (_definition) => notImplemented("actionDefinitions.save"),
+  delete: (_id) => notImplemented("actionDefinitions.delete")
+};
+
 const dataverseNotificationService: INotificationService = {
   send: (_payload: NotificationPayload) => notImplemented("notifications.send")
 };
@@ -86,6 +95,7 @@ export const dataverseHostAdapter: IHostAdapter = {
   users: dataverseUserRepository,
   branches: dataverseBranchRepository,
   departments: dataverseDepartmentRepository,
+  actionDefinitions: dataverseActionDefinitionRepository,
   referenceConfigs: dataverseReferenceConfigRepository,
   smtpSettings: dataverseSmtpSettings,
   notifications: dataverseNotificationService,

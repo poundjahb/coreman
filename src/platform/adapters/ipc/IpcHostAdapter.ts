@@ -46,6 +46,13 @@ export function createIpcHostAdapter(): IHostAdapter {
       save: (department) => api.departments.save(department),
       delete: (id) => api.departments.delete(id)
     },
+    actionDefinitions: {
+      findById: (id) => api.actionDefinitions.findById(id),
+      findAll: () => api.actionDefinitions.findAll(),
+      findActive: () => api.actionDefinitions.findActive(),
+      save: (definition) => api.actionDefinitions.save(definition),
+      delete: (id) => api.actionDefinitions.delete(id)
+    },
     referenceConfigs: {
       findAll: () => api.referenceConfigs.findAll(),
       findActive: () => api.referenceConfigs.findActive()

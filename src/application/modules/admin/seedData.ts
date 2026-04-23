@@ -1,4 +1,5 @@
 import type { Correspondence } from "../../../domain/correspondence";
+import type { CorrespondenceActionDefinition } from "../../../domain/correspondenceAction";
 import { ALL_ROLE_CODES, type AppUser, type Branch, type BranchDepartment, type Department } from "../../../domain/governance";
 import type { ReferenceFormatConfig } from "../../../domain/reference";
 
@@ -105,6 +106,50 @@ export const demoReferenceConfigs: ReferenceFormatConfig[] = [
     pattern: "{ORG}-{YYYY}{MM}-{SEQ4}",
     resetPolicy: "MONTHLY",
     isActive: true
+  }
+];
+
+export const demoActionDefinitions: CorrespondenceActionDefinition[] = [
+  {
+    id: "act-001",
+    code: "FOR_INFORMATION",
+    label: "For Information",
+    description: "Read-only action; no external workflow is triggered.",
+    category: "INFO",
+    requiresOwner: false,
+    triggerMode: "NONE",
+    workflowEnabled: false,
+    workflowMethod: "POST",
+    workflowTimeoutMs: 10000,
+    authType: "NONE",
+    retryMaxAttempts: 0,
+    retryBackoffMs: 0,
+    defaultSlaDays: 0,
+    isActive: true,
+    createdAt: new Date("2026-04-20T08:00:00.000Z"),
+    updatedAt: new Date("2026-04-20T08:00:00.000Z")
+  },
+  {
+    id: "act-002",
+    code: "RESPOND_TO",
+    label: "Respond To",
+    description: "Owner-triggered action that calls an HTTP workflow endpoint.",
+    category: "RESPONSE",
+    requiresOwner: true,
+    triggerMode: "OWNER_EXECUTE",
+    workflowEnabled: true,
+    workflowMethod: "POST",
+    workflowEndpointUrl: "https://workflow.local/respond",
+    workflowTimeoutMs: 15000,
+    authType: "BEARER_TOKEN_REF",
+    authSecretRef: "secrets/workflow/respond-token",
+    payloadTemplate: "{\"correspondenceId\":\"{{correspondence.id}}\",\"actionCode\":\"{{action.code}}\"}",
+    retryMaxAttempts: 2,
+    retryBackoffMs: 2000,
+    defaultSlaDays: 3,
+    isActive: true,
+    createdAt: new Date("2026-04-20T08:00:00.000Z"),
+    updatedAt: new Date("2026-04-20T08:00:00.000Z")
   }
 ];
 

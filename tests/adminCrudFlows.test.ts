@@ -55,3 +55,89 @@ test("seeded default super admin has all platform roles", () => {
     assert.ok(roles.has(role), `Missing role ${role}`);
   }
 });
+
+test("in-memory action definitions support CRUD and active filtering", async () => {
+  const adapter = createInMemoryHostAdapter();
+  const initialCount = (await adapter.actionDefinitions.findAll()).length;
+
+  const now = new Date();
+  await adapter.actionDefinitions.save({
+    id: "act-900",
+    code: "EXEC_PROCESS_X",
+    label: "Execute Process X",
+    description: "Owner-executed workflow action",
+    category: "PROCESS",
+    requiresOwner: true,
+    triggerMode: "OWNER_EXECUTE",
+    workflowEnabled: true,
+    workflowMethod: "POST",
+    workflowEndpointUrl: "https://workflow.local/process-x",
+    workflowTimeoutMs: 12000,
+    authType: "API_KEY",
+    authSecretRef: "secrets/process-x-api-key",
+    payloadTemplate: "{\"correspondenceId\":\"{{correspondence.id}}\"}",
+    retryMaxAttempts: 1,
+    retryBackoffMs: 500,
+    defaultSlaDays: 2,
+    isActive: true,
+    createdAt: now,
+    updatedAt: now
+  });
+
+  const saved = await adapter.actionDefinitions.findById("act-900");
+  assert.ok(saved);
+  assert.equal(saved.code, "EXEC_PROCESS_X");
+
+  const active = await adapter.actionDefinitions.findActive();
+  assert.ok(active.some((definition) => definition.id === "act-900"));
+
+  await adapter.actionDefinitions.delete("act-900");
+  assert.equal(await adapter.actionDefinitions.findById("act-900"), null);
+  assert.equal((await adapter.actionDefinitions.findAll()).length, initialCount);
+});
+
+test("in-memory action definitions reject duplicate code", async () => {
+  const adapter = createInMemoryHostAdapter();
+  const now = new Date();
+
+  await adapter.actionDefinitions.save({
+    id: "act-910",
+    code: "UNIQUE_CODE_A",
+    label: "Unique A",
+    category: "TASK",
+    requiresOwner: true,
+    triggerMode: "OWNER_EXECUTE",
+    workflowEnabled: true,
+    workflowMethod: "POST",
+    workflowEndpointUrl: "https://workflow.local/task-a",
+    workflowTimeoutMs: 8000,
+    authType: "NONE",
+    retryMaxAttempts: 0,
+    retryBackoffMs: 0,
+    isActive: true,
+    createdAt: now,
+    updatedAt: now
+  });
+
+  await assert.rejects(
+    adapter.actionDefinitions.save({
+      id: "act-911",
+      code: "unique_code_a",
+      label: "Unique A Duplicate",
+      category: "TASK",
+      requiresOwner: true,
+      triggerMode: "OWNER_EXECUTE",
+      workflowEnabled: true,
+      workflowMethod: "POST",
+      workflowEndpointUrl: "https://workflow.local/task-b",
+      workflowTimeoutMs: 8000,
+      authType: "NONE",
+      retryMaxAttempts: 0,
+      retryBackoffMs: 0,
+      isActive: true,
+      createdAt: now,
+      updatedAt: now
+    }),
+    /already exists/
+  );
+});
