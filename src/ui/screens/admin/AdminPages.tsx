@@ -5,7 +5,8 @@ export { AdminBranchesPage } from "./AdminBranchesPage";
 export { AdminDepartmentsPage } from "./AdminDepartmentsPage";
 export { AdminUsersPage } from "./AdminUsersPage";
 export { AdminActionsCatalogPage } from "./AdminActionsCatalogPage";
-export { AdminSmtpSettingsPage } from "./AdminSmtpSettingsPage";
+export { AdminSmtpSettingsPage } from "./AdminSmtpSettingsPage"; // Legacy export
+export { AdminEmailSettingsPage } from "./AdminEmailSettingsPage";
 export { AdminFlowAgentsPage } from "./AdminFlowAgentsPage";
 export { AdminAuditLogsPage } from "./AdminAuditLogsPage";
 export { AdminHealthPage } from "./AdminHealthPage";
@@ -15,7 +16,7 @@ export { AdminPerformancePage } from "./AdminPerformancePage";
 import { AdminBranchesPage } from "./AdminBranchesPage";
 import { AdminDepartmentsPage } from "./AdminDepartmentsPage";
 import { AdminActionsCatalogPage } from "./AdminActionsCatalogPage";
-import { AdminSmtpSettingsPage } from "./AdminSmtpSettingsPage";
+import { AdminEmailSettingsPage } from "./AdminEmailSettingsPage";
 
 /**
  * Tab wrapper for Reference Data (Branches + Departments)
@@ -49,7 +50,7 @@ export function AdminReferenceDataPage(): JSX.Element {
 }
 
 /**
- * Tab wrapper for System Control (SMTP Settings + Actions)
+ * Tab wrapper for System Control (Email Settings + Actions)
  */
 export function AdminSystemControlTabPage(): JSX.Element {
   return (
@@ -57,17 +58,17 @@ export function AdminSystemControlTabPage(): JSX.Element {
       <Stack gap="lg">
         <div>
           <Title order={2}>Admin - System Control</Title>
-          <Text c="dimmed" size="sm">Manage SMTP settings and action definitions from a single entry point.</Text>
+          <Text c="dimmed" size="sm">Manage email settings and action definitions from a single entry point.</Text>
         </div>
 
-        <Tabs defaultValue="smtp" variant="outline">
+        <Tabs defaultValue="email" variant="outline">
           <Tabs.List>
-            <Tabs.Tab value="smtp">SMTP Settings</Tabs.Tab>
+            <Tabs.Tab value="email">Email Settings</Tabs.Tab>
             <Tabs.Tab value="actions">Actions</Tabs.Tab>
           </Tabs.List>
 
-          <Tabs.Panel value="smtp" pt="md">
-            <AdminSmtpSettingsPage embedded />
+          <Tabs.Panel value="email" pt="md">
+            <AdminEmailSettingsPage embedded />
           </Tabs.Panel>
 
           <Tabs.Panel value="actions" pt="md">

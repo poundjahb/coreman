@@ -8,6 +8,7 @@ import type { INotificationService, NotificationPayload } from "../../contracts/
 import type { ICorrespondenceAuditLogRepository } from "../../contracts/ICorrespondenceAuditLogRepository";
 import type { IPostCaptureWorkflowService } from "../../contracts/IPostCaptureWorkflowService";
 import type { ISmtpSettingsService } from "../../contracts/ISmtpSettingsService";
+import type { IEmailService } from "../../contracts/IEmailService";
 import type { SequenceStore } from "../../../domain/reference";
 import type { ICorrespondenceActionDefinitionRepository } from "../../contracts/ICorrespondenceActionDefinitionRepository";
 import { buildPlatformIndicator } from "../../platformIndicator";
@@ -89,6 +90,13 @@ const dataverseSmtpSettings: ISmtpSettingsService = {
   sendTestEmail: () => notImplemented("smtpSettings.sendTestEmail")
 };
 
+const dataverseEmailSettings: IEmailService = {
+  getConfig: () => notImplemented("emailSettings.getConfig"),
+  saveConfig: () => notImplemented("emailSettings.saveConfig"),
+  sendTestEmail: () => notImplemented("emailSettings.sendTestEmail"),
+  sendEmail: () => notImplemented("emailSettings.sendEmail")
+};
+
 export const dataverseHostAdapter: IHostAdapter = {
   platform: dataversePlatformIndicator,
   correspondences: dataverseCorrespondenceRepository,
@@ -98,6 +106,7 @@ export const dataverseHostAdapter: IHostAdapter = {
   actionDefinitions: dataverseActionDefinitionRepository,
   referenceConfigs: dataverseReferenceConfigRepository,
   smtpSettings: dataverseSmtpSettings,
+  emailSettings: dataverseEmailSettings,
   notifications: dataverseNotificationService,
   correspondenceAuditLog: dataverseAuditLog,
   postCaptureWorkflow: dataversePostCaptureWorkflow,

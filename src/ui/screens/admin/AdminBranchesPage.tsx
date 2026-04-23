@@ -37,14 +37,19 @@ export function AdminBranchesPage(props?: { embedded?: boolean }): JSX.Element {
       return;
     }
 
-    await runtimeHostAdapter.branches.save({
-      id: editor.id ?? crypto.randomUUID(),
-      code: editor.code.trim(),
-      name: editor.name.trim(),
-      isActive: editor.isActive
-    });
-    setEditor(emptyEditorState);
-    await loadBranches();
+    try {
+      setError(null);
+      await runtimeHostAdapter.branches.save({
+        id: editor.id ?? crypto.randomUUID(),
+        code: editor.code.trim(),
+        name: editor.name.trim(),
+        isActive: editor.isActive
+      });
+      setEditor(emptyEditorState);
+      await loadBranches();
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : "Failed to save branch.");
+    }
   }
 
   async function handleDelete(branch: Branch): Promise<void> {
@@ -52,11 +57,16 @@ export function AdminBranchesPage(props?: { embedded?: boolean }): JSX.Element {
       return;
     }
 
-    await runtimeHostAdapter.branches.delete(branch.id);
-    if (editor.id === branch.id) {
-      setEditor(emptyEditorState);
+    try {
+      setError(null);
+      await runtimeHostAdapter.branches.delete(branch.id);
+      if (editor.id === branch.id) {
+        setEditor(emptyEditorState);
+      }
+      await loadBranches();
+    } catch (deleteError) {
+      setError(deleteError instanceof Error ? deleteError.message : "Failed to delete branch.");
     }
-    await loadBranches();
   }
 
   return (

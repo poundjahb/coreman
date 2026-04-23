@@ -2,7 +2,7 @@ import type { SmtpConfig } from "../../config/systemConfig";
 
 export interface SendTestEmailCommand {
   to: string;
-  config: SmtpConfig;
+  config?: SmtpConfig;
   subject?: string;
   body?: string;
 }

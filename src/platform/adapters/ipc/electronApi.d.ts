@@ -9,6 +9,7 @@ import type {
 import type { NotificationPayload } from "../../contracts/INotificationService";
 import type { ExecutePostCaptureWorkflowCommand } from "../../contracts/IPostCaptureWorkflowService";
 import type { SendTestEmailCommand } from "../../contracts/ISmtpSettingsService";
+import type { EmailConfig, SendTestEmailCommand as SendTestEmailCommand2 } from "../../contracts/IEmailService";
 import type { SmtpConfig } from "../../../config/systemConfig";
 
 /**
@@ -57,6 +58,12 @@ export interface ElectronAPI {
     getConfig(): Promise<SmtpConfig>;
     saveConfig(config: SmtpConfig): Promise<void>;
     sendTestEmail(command: SendTestEmailCommand): Promise<void>;
+  };
+  emailSettings: {
+    getConfig(): Promise<EmailConfig>;
+    saveConfig(config: EmailConfig): Promise<void>;
+    sendTestEmail(command: SendTestEmailCommand2): Promise<void>;
+    sendEmail(command: { to: string; subject: string; body: string }): Promise<any>;
   };
   notifications: {
     send(payload: NotificationPayload): Promise<void>;

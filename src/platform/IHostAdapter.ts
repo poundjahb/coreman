@@ -8,6 +8,7 @@ import type { INotificationService } from "./contracts/INotificationService";
 import type { IPostCaptureWorkflowService } from "./contracts/IPostCaptureWorkflowService";
 import type { IReferenceConfigRepository } from "./contracts/IReferenceConfigRepository";
 import type { ISmtpSettingsService } from "./contracts/ISmtpSettingsService";
+import type { IEmailService } from "./contracts/IEmailService";
 import type { IUserRepository } from "./contracts/IUserRepository";
 import type { ICorrespondenceActionDefinitionRepository } from "./contracts/ICorrespondenceActionDefinitionRepository";
 
@@ -26,6 +27,7 @@ export interface IHostAdapter {
   actionDefinitions: ICorrespondenceActionDefinitionRepository;
   referenceConfigs: IReferenceConfigRepository;
   smtpSettings: ISmtpSettingsService;
+  emailSettings: IEmailService;
   notifications: INotificationService;
   correspondenceAuditLog: ICorrespondenceAuditLogRepository;
   postCaptureWorkflow: IPostCaptureWorkflowService;

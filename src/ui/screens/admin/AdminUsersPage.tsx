@@ -122,22 +122,27 @@ export function AdminUsersPage(props: { onUsersChanged?: () => Promise<void> | v
       return;
     }
 
-    await runtimeHostAdapter.users.save({
-      id: editor.id ?? crypto.randomUUID(),
-      employeeCode: editor.employeeCode.trim(),
-      fullName: editor.fullName.trim(),
-      email: editor.email.trim(),
-      branchId: editor.branchId,
-      departmentId: editor.departmentId,
-      isActive: editor.isActive,
-      canLogin: editor.canLogin,
-      canOwnActions: editor.canOwnActions,
-      roles: editor.roles
-    });
+    try {
+      setError(null);
+      await runtimeHostAdapter.users.save({
+        id: editor.id ?? crypto.randomUUID(),
+        employeeCode: editor.employeeCode.trim(),
+        fullName: editor.fullName.trim(),
+        email: editor.email.trim(),
+        branchId: editor.branchId,
+        departmentId: editor.departmentId,
+        isActive: editor.isActive,
+        canLogin: editor.canLogin,
+        canOwnActions: editor.canOwnActions,
+        roles: editor.roles
+      });
 
-    setEditor(emptyUserEditorState);
-    await loadUsersPage();
-    await onUsersChanged?.();
+      setEditor(emptyUserEditorState);
+      await loadUsersPage();
+      await onUsersChanged?.();
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : "Failed to save user.");
+    }
   }
 
   async function handleDelete(user: AppUser): Promise<void> {
@@ -145,12 +150,17 @@ export function AdminUsersPage(props: { onUsersChanged?: () => Promise<void> | v
       return;
     }
 
-    await runtimeHostAdapter.users.delete(user.id);
-    if (editor.id === user.id) {
-      setEditor(emptyUserEditorState);
+    try {
+      setError(null);
+      await runtimeHostAdapter.users.delete(user.id);
+      if (editor.id === user.id) {
+        setEditor(emptyUserEditorState);
+      }
+      await loadUsersPage();
+      await onUsersChanged?.();
+    } catch (deleteError) {
+      setError(deleteError instanceof Error ? deleteError.message : "Failed to delete user.");
     }
-    await loadUsersPage();
-    await onUsersChanged?.();
   }
 
   return (

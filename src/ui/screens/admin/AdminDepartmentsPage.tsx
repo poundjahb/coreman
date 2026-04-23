@@ -37,14 +37,19 @@ export function AdminDepartmentsPage(props?: { embedded?: boolean }): JSX.Elemen
       return;
     }
 
-    await runtimeHostAdapter.departments.save({
-      id: editor.id ?? crypto.randomUUID(),
-      code: editor.code.trim(),
-      name: editor.name.trim(),
-      isActive: editor.isActive
-    });
-    setEditor(emptyEditorState);
-    await loadDepartments();
+    try {
+      setError(null);
+      await runtimeHostAdapter.departments.save({
+        id: editor.id ?? crypto.randomUUID(),
+        code: editor.code.trim(),
+        name: editor.name.trim(),
+        isActive: editor.isActive
+      });
+      setEditor(emptyEditorState);
+      await loadDepartments();
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : "Failed to save department.");
+    }
   }
 
   async function handleDelete(department: Department): Promise<void> {
@@ -52,11 +57,16 @@ export function AdminDepartmentsPage(props?: { embedded?: boolean }): JSX.Elemen
       return;
     }
 
-    await runtimeHostAdapter.departments.delete(department.id);
-    if (editor.id === department.id) {
-      setEditor(emptyEditorState);
+    try {
+      setError(null);
+      await runtimeHostAdapter.departments.delete(department.id);
+      if (editor.id === department.id) {
+        setEditor(emptyEditorState);
+      }
+      await loadDepartments();
+    } catch (deleteError) {
+      setError(deleteError instanceof Error ? deleteError.message : "Failed to delete department.");
     }
-    await loadDepartments();
   }
 
   return (

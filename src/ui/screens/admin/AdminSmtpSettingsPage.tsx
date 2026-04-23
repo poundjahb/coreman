@@ -14,19 +14,25 @@ import {
 } from "@mantine/core";
 import type { SmtpConfig } from "../../../config/systemConfig";
 import { runtimeHostAdapter, runtimePlatformTarget } from "../../../platform/runtimeHostAdapter";
+import {
+  loadSmtpSettingsConfig,
+  saveSmtpSettingsConfig,
+  sendSmtpTestEmailUsingSavedConfig
+} from "../../../application/modules/admin/smtpSettings";
 
 export function AdminSmtpSettingsPage(props?: { embedded?: boolean }): JSX.Element {
   const embedded = props?.embedded ?? false;
   const activePlatformTarget = runtimeHostAdapter.platform.target;
   const configuredPlatformTarget = runtimePlatformTarget;
   const hasPlatformFallback = configuredPlatformTarget !== activePlatformTarget;
-  const smtpTransportAvailable = activePlatformTarget === "SQLITE";
+  const smtpTransportAvailable = activePlatformTarget === "SQLITE" || activePlatformTarget === "SERVER";
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [testRecipient, setTestRecipient] = useState("");
+  const [savedFormSignature, setSavedFormSignature] = useState<string | null>(null);
   const [form, setForm] = useState({
     host: "",
     port: "1025",
@@ -47,6 +53,10 @@ export function AdminSmtpSettingsPage(props?: { embedded?: boolean }): JSX.Eleme
       fromAddress: config.fromAddress,
       connectionTimeoutMs: String(config.connectionTimeoutMs)
     };
+  }
+
+  function getFormSignature(nextForm: typeof form): string {
+    return JSON.stringify(nextForm);
   }
 
   function buildConfigFromForm(): SmtpConfig {
@@ -84,8 +94,10 @@ export function AdminSmtpSettingsPage(props?: { embedded?: boolean }): JSX.Eleme
     try {
       setLoading(true);
       setError(null);
-      const config = await runtimeHostAdapter.smtpSettings.getConfig();
-      setForm(mapConfigToForm(config));
+      const config = await loadSmtpSettingsConfig();
+      const mappedForm = mapConfigToForm(config);
+      setForm(mappedForm);
+      setSavedFormSignature(getFormSignature(mappedForm));
       if (!testRecipient) {
         setTestRecipient(config.fromAddress);
       }
@@ -106,7 +118,10 @@ export function AdminSmtpSettingsPage(props?: { embedded?: boolean }): JSX.Eleme
       setError(null);
       setSuccess(null);
       const config = buildConfigFromForm();
-      await runtimeHostAdapter.smtpSettings.saveConfig(config);
+      await saveSmtpSettingsConfig(config);
+      const mappedForm = mapConfigToForm(config);
+      setForm(mappedForm);
+      setSavedFormSignature(getFormSignature(mappedForm));
       setSuccess("SMTP configuration saved.");
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : "Unable to save SMTP configuration.");
@@ -114,6 +129,8 @@ export function AdminSmtpSettingsPage(props?: { embedded?: boolean }): JSX.Eleme
       setSaving(false);
     }
   }
+
+  const isFormDirty = savedFormSignature !== null && getFormSignature(form) !== savedFormSignature;
 
   async function handleTestSend(): Promise<void> {
     try {
@@ -123,7 +140,7 @@ export function AdminSmtpSettingsPage(props?: { embedded?: boolean }): JSX.Eleme
 
       if (!smtpTransportAvailable) {
         throw new Error(
-          `SMTP test send is unavailable in ${activePlatformTarget} mode. Start SQLITE (Electron) mode to send real test emails.`
+          `SMTP test send is unavailable in ${activePlatformTarget} mode. Start SQLITE or SERVER mode to send test emails.`
         );
       }
 
@@ -131,10 +148,8 @@ export function AdminSmtpSettingsPage(props?: { embedded?: boolean }): JSX.Eleme
         throw new Error("Provide a recipient email for test send.");
       }
 
-      const config = buildConfigFromForm();
-      await runtimeHostAdapter.smtpSettings.sendTestEmail({
+      await sendSmtpTestEmailUsingSavedConfig({
         to: testRecipient.trim(),
-        config,
         subject: "Coreman SMTP test",
         body: "This is a test email sent from Admin System Control."
       });
@@ -167,15 +182,21 @@ export function AdminSmtpSettingsPage(props?: { embedded?: boolean }): JSX.Eleme
         </Alert>
       )}
 
+      {isFormDirty && (
+        <Alert color="yellow" title="Unsaved SMTP Changes">
+          {"Test Send uses the saved configuration from storage. Click Save Configuration first to apply the latest changes."}
+        </Alert>
+      )}
+
       {hasPlatformFallback && (
         <Alert color="yellow" title="Platform Fallback Detected">
-          {`Configured target is ${configuredPlatformTarget}, but active adapter is ${activePlatformTarget}. SQLite target falls back when the Electron bridge is unavailable, and SMTP test send will not reach a real transport.`}
+          {`Configured target is ${configuredPlatformTarget}, but active adapter is ${activePlatformTarget}. Verify runtime platform configuration to ensure SMTP behavior matches your deployment target.`}
         </Alert>
       )}
 
       {!smtpTransportAvailable && !hasPlatformFallback && (
         <Alert color="yellow" title="SMTP Transport Unavailable">
-          {`Active mode is ${activePlatformTarget}. Start SQLITE (Electron) mode to run SMTP test delivery.`}
+          {`Active mode is ${activePlatformTarget}. Start SQLITE or SERVER mode to run SMTP test delivery.`}
         </Alert>
       )}
 
@@ -191,19 +212,26 @@ export function AdminSmtpSettingsPage(props?: { embedded?: boolean }): JSX.Eleme
               <TextInput
                 label="Host"
                 value={form.host}
-                onChange={(event) => setForm((current) => ({ ...current, host: event.currentTarget.value }))}
+                onChange={(event) => {
+                  const host = event.currentTarget.value;
+                  setForm((current) => ({ ...current, host }));
+                }}
               />
               <TextInput
                 label="Port"
                 value={form.port}
-                onChange={(event) => setForm((current) => ({ ...current, port: event.currentTarget.value }))}
+                onChange={(event) => {
+                  const port = event.currentTarget.value;
+                  setForm((current) => ({ ...current, port }));
+                }}
               />
               <TextInput
                 label="Connection Timeout (ms)"
                 value={form.connectionTimeoutMs}
-                onChange={(event) =>
-                  setForm((current) => ({ ...current, connectionTimeoutMs: event.currentTarget.value }))
-                }
+                onChange={(event) => {
+                  const connectionTimeoutMs = event.currentTarget.value;
+                  setForm((current) => ({ ...current, connectionTimeoutMs }));
+                }}
               />
             </Group>
 
@@ -211,13 +239,19 @@ export function AdminSmtpSettingsPage(props?: { embedded?: boolean }): JSX.Eleme
               <TextInput
                 label="SMTP Username"
                 value={form.user}
-                onChange={(event) => setForm((current) => ({ ...current, user: event.currentTarget.value }))}
+                onChange={(event) => {
+                  const user = event.currentTarget.value;
+                  setForm((current) => ({ ...current, user }));
+                }}
               />
               <TextInput
                 label="SMTP Password"
                 type="password"
                 value={form.pass}
-                onChange={(event) => setForm((current) => ({ ...current, pass: event.currentTarget.value }))}
+                onChange={(event) => {
+                  const pass = event.currentTarget.value;
+                  setForm((current) => ({ ...current, pass }));
+                }}
               />
             </Group>
 
@@ -225,22 +259,33 @@ export function AdminSmtpSettingsPage(props?: { embedded?: boolean }): JSX.Eleme
               <TextInput
                 label="From Address"
                 value={form.fromAddress}
-                onChange={(event) =>
-                  setForm((current) => ({ ...current, fromAddress: event.currentTarget.value }))
-                }
+                onChange={(event) => {
+                  const fromAddress = event.currentTarget.value;
+                  setForm((current) => ({ ...current, fromAddress }));
+                }}
               />
               <TextInput
                 label="Test Recipient"
                 value={testRecipient}
-                onChange={(event) => setTestRecipient(event.currentTarget.value)}
+                onChange={(event) => {
+                  const recipient = event.currentTarget.value;
+                  setTestRecipient(recipient);
+                }}
               />
             </Group>
 
             <Switch
               label="Secure TLS"
               checked={form.secure}
-              onChange={(event) => setForm((current) => ({ ...current, secure: event.currentTarget.checked }))}
+              onChange={(event) => {
+                const secure = event.currentTarget.checked;
+                setForm((current) => ({ ...current, secure }));
+              }}
             />
+
+            <Text c="dimmed" size="xs">
+              {"TLS hint: use Secure TLS ON for implicit TLS (typically port 465). Use Secure TLS OFF for plain SMTP/STARTTLS (typically port 587 or local test port 1025)."}
+            </Text>
 
             <Group justify="flex-end">
               <Button variant="default" onClick={() => void loadConfig()}>Reload</Button>
@@ -248,7 +293,7 @@ export function AdminSmtpSettingsPage(props?: { embedded?: boolean }): JSX.Eleme
                 variant="light"
                 onClick={() => void handleTestSend()}
                 loading={testing}
-                disabled={!smtpTransportAvailable || loading}
+                disabled={!smtpTransportAvailable || loading || isFormDirty}
               >
                 Test Send
               </Button>

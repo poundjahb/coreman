@@ -1,5 +1,4 @@
 import type { IHostAdapter } from "../../IHostAdapter";
-import { getRuntimeSmtpConfig, type SmtpConfig } from "../../../config/systemConfig";
 import { openDatabase } from "./SqliteDatabase";
 import { SqliteCorrespondenceRepository } from "./SqliteCorrespondenceRepository";
 import { SqliteUserRepository } from "./SqliteUserRepository";
@@ -21,20 +20,15 @@ export const sqliteMainProcessPlatformIndicator = buildPlatformIndicator({
   backgroundColor: "#5742d6"
 });
 
-export interface CreateSqliteHostAdapterOptions {
-  smtpConfig?: SmtpConfig;
-}
-
 /**
  * Creates a fully wired SQLite host adapter.
  * Call this from the Electron main process, passing the path to the .db file.
  */
 export function createSqliteHostAdapter(
-  dbPath: string,
-  options: CreateSqliteHostAdapterOptions = {}
+  dbPath: string
 ): IHostAdapter {
   const db = openDatabase(dbPath);
-  const smtpSettings = new SqliteSmtpSettingsService(db, options.smtpConfig ?? getRuntimeSmtpConfig());
+  const smtpSettings = new SqliteSmtpSettingsService(db);
   const notifications = new SqliteNotificationService(db, smtpSettings);
   const correspondenceAuditLog = new SqliteCorrespondenceAuditLogRepository(db);
 

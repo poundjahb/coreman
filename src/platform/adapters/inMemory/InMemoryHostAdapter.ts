@@ -16,6 +16,7 @@ import { InMemoryNotificationService } from "./InMemoryNotificationService";
 import { InMemoryPostCaptureWorkflowService } from "./InMemoryPostCaptureWorkflowService";
 import { InMemoryReferenceConfigRepository } from "./InMemoryReferenceConfigRepository";
 import { InMemorySmtpSettingsService } from "./InMemorySmtpSettingsService";
+import { InMemoryEmailService } from "./InMemoryEmailService";
 import { InMemoryUserRepository } from "./InMemoryUserRepository";
 import { InMemoryCorrespondenceAuditLogRepository } from "./InMemoryCorrespondenceAuditLogRepository";
 import { buildPlatformIndicator } from "../../platformIndicator";
@@ -31,6 +32,7 @@ export function createInMemoryHostAdapter(): IHostAdapter {
   const notifications = new InMemoryNotificationService();
   const correspondenceAuditLog = new InMemoryCorrespondenceAuditLogRepository();
   const smtpSettings = new InMemorySmtpSettingsService();
+  const emailSettings = new InMemoryEmailService();
 
   return {
     platform: inMemoryPlatformIndicator,
@@ -41,6 +43,7 @@ export function createInMemoryHostAdapter(): IHostAdapter {
     actionDefinitions: new InMemoryCorrespondenceActionDefinitionRepository(demoActionDefinitions),
     referenceConfigs: new InMemoryReferenceConfigRepository(demoReferenceConfigs),
     smtpSettings,
+    emailSettings,
     notifications,
     correspondenceAuditLog,
     postCaptureWorkflow: new InMemoryPostCaptureWorkflowService(notifications, correspondenceAuditLog),

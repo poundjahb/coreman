@@ -1,5 +1,5 @@
 import type { Database } from "better-sqlite3";
-import { getRuntimeSmtpConfig, type SmtpConfig } from "../../../config/systemConfig";
+import type { SmtpConfig } from "../../../config/systemConfig";
 import type { ISmtpSettingsService, SendTestEmailCommand } from "../../contracts/ISmtpSettingsService";
 import { NodemailerSqliteMailer } from "./SqliteMailer";
 
@@ -26,10 +26,7 @@ function rowToConfig(row: SmtpSettingsRow): SmtpConfig {
 }
 
 export class SqliteSmtpSettingsService implements ISmtpSettingsService {
-  constructor(
-    private readonly db: Database,
-    private readonly fallbackConfig: SmtpConfig = getRuntimeSmtpConfig()
-  ) {}
+  constructor(private readonly db: Database) {}
 
   async getConfig(): Promise<SmtpConfig> {
     const row = this.db
@@ -41,7 +38,7 @@ export class SqliteSmtpSettingsService implements ISmtpSettingsService {
       .get() as SmtpSettingsRow | undefined;
 
     if (!row) {
-      return { ...this.fallbackConfig };
+      throw new Error("SMTP settings are not configured. Save configuration before using SMTP operations.");
     }
 
     return rowToConfig(row);
@@ -80,8 +77,9 @@ export class SqliteSmtpSettingsService implements ISmtpSettingsService {
   async sendTestEmail(command: SendTestEmailCommand): Promise<void> {
     const subject = command.subject ?? "SMTP Test Email";
     const body = command.body ?? "SMTP configuration test completed successfully.";
+    const config = command.config ?? (await this.getConfig());
 
-    await new NodemailerSqliteMailer(command.config).send({
+    await new NodemailerSqliteMailer(config).send({
       to: command.to,
       subject,
       text: body

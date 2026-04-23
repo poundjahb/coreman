@@ -156,14 +156,19 @@ export function AdminActionsCatalogPage(props?: { embedded?: boolean }): JSX.Ele
       return;
     }
 
-    const existing = editor.id
-      ? definitions.find((definition) => definition.id === editor.id) ?? null
-      : null;
+    try {
+      setError(null);
+      const existing = editor.id
+        ? definitions.find((definition) => definition.id === editor.id) ?? null
+        : null;
 
-    const definition = buildDefinitionFromEditor(existing);
-    await runtimeHostAdapter.actionDefinitions.save(definition);
-    setEditor(emptyActionDefinitionEditorState);
-    await loadDefinitions();
+      const definition = buildDefinitionFromEditor(existing);
+      await runtimeHostAdapter.actionDefinitions.save(definition);
+      setEditor(emptyActionDefinitionEditorState);
+      await loadDefinitions();
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : "Failed to save action definition.");
+    }
   }
 
   async function handleDelete(definition: CorrespondenceActionDefinition): Promise<void> {
@@ -171,11 +176,16 @@ export function AdminActionsCatalogPage(props?: { embedded?: boolean }): JSX.Ele
       return;
     }
 
-    await runtimeHostAdapter.actionDefinitions.delete(definition.id);
-    if (editor.id === definition.id) {
-      setEditor(emptyActionDefinitionEditorState);
+    try {
+      setError(null);
+      await runtimeHostAdapter.actionDefinitions.delete(definition.id);
+      if (editor.id === definition.id) {
+        setEditor(emptyActionDefinitionEditorState);
+      }
+      await loadDefinitions();
+    } catch (deleteError) {
+      setError(deleteError instanceof Error ? deleteError.message : "Failed to delete action definition.");
     }
-    await loadDefinitions();
   }
 
   const content = (

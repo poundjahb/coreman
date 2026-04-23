@@ -13,6 +13,7 @@ import type {
 } from "../../contracts/IPostCaptureWorkflowService";
 import type { NotificationPayload } from "../../contracts/INotificationService";
 import type { SendTestEmailCommand } from "../../contracts/ISmtpSettingsService";
+import type { EmailConfig, SendTestEmailCommand as SendTestEmailCommand2 } from "../../contracts/IEmailService";
 import { buildPlatformIndicator } from "../../platformIndicator";
 
 export const serverPlatformIndicator = buildPlatformIndicator({
@@ -199,6 +200,14 @@ export function createHttpHostAdapter(options: HttpHostAdapterOptions = {}): IHo
       saveConfig: (config: SmtpConfig): Promise<void> => requestJson<void>(apiBaseUrl, "/api/smtp-settings", "PUT", config),
       sendTestEmail: (command: SendTestEmailCommand): Promise<void> =>
         requestJson<void>(apiBaseUrl, "/api/smtp-settings/test", "POST", command)
+    },
+    emailSettings: {
+      getConfig: (): Promise<EmailConfig> => requestJson<EmailConfig>(apiBaseUrl, "/api/email-settings", "GET"),
+      saveConfig: (config: EmailConfig): Promise<void> => requestJson<void>(apiBaseUrl, "/api/email-settings", "PUT", config),
+      sendTestEmail: (command: SendTestEmailCommand2): Promise<void> =>
+        requestJson<void>(apiBaseUrl, "/api/email-settings/test", "POST", command),
+      sendEmail: (command: { to: string; subject: string; body: string }): Promise<any> =>
+        requestJson<any>(apiBaseUrl, "/api/email-settings/send", "POST", command)
     },
     notifications: {
       send: (payload: NotificationPayload): Promise<void> => requestJson<void>(apiBaseUrl, "/api/notifications", "POST", payload)
