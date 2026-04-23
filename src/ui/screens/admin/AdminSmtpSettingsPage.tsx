@@ -151,7 +151,9 @@ export function AdminSmtpSettingsPage(props?: { embedded?: boolean }): JSX.Eleme
       target.getAttribute("contenteditable") === "true";
 
     if (isFormField) {
-      event.stopPropagation();
+        // Prevent app-level shortcuts from hijacking normal typing in form inputs
+        event.stopPropagation();
+        event.preventDefault();
     }
   }
 
