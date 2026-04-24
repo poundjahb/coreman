@@ -55,6 +55,8 @@ export function initializeDatabase(): Database.Database {
       id TEXT PRIMARY KEY,
       referenceNumber TEXT NOT NULL UNIQUE,
       senderReference TEXT,
+      fromTo TEXT NOT NULL DEFAULT '',
+      organisation TEXT,
       branchId TEXT NOT NULL,
       departmentId TEXT,
       recipientId TEXT,
@@ -96,6 +98,21 @@ export function initializeDatabase(): Database.Database {
       isActive INTEGER NOT NULL DEFAULT 1,
       createdAt TEXT NOT NULL,
       updatedAt TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS correspondence_task_assignments (
+      id TEXT PRIMARY KEY,
+      correspondenceId TEXT NOT NULL,
+      actionDefinitionId TEXT NOT NULL,
+      description TEXT,
+      assigneeUserId TEXT NOT NULL,
+      ccUserIdsJson TEXT NOT NULL DEFAULT '[]',
+      deadline TEXT NOT NULL,
+      status TEXT NOT NULL,
+      createdAt TEXT NOT NULL,
+      updatedAt TEXT NOT NULL,
+      createdBy TEXT NOT NULL,
+      updatedBy TEXT NOT NULL
     );
 
     CREATE TABLE IF NOT EXISTS reference_configs (
@@ -148,6 +165,16 @@ export function initializeDatabase(): Database.Database {
     db.exec("ALTER TABLE correspondences ADD COLUMN recipientId TEXT");
   }
 
+  const hasFromTo = correspondenceColumns.some((column) => column.name === "fromTo");
+  if (!hasFromTo) {
+    db.exec("ALTER TABLE correspondences ADD COLUMN fromTo TEXT NOT NULL DEFAULT ''");
+  }
+
+  const hasOrganisation = correspondenceColumns.some((column) => column.name === "organisation");
+  if (!hasOrganisation) {
+    db.exec("ALTER TABLE correspondences ADD COLUMN organisation TEXT");
+  }
+
   const hasAttachmentFileName = correspondenceColumns.some((column) => column.name === "attachmentFileName");
   if (!hasAttachmentFileName) {
     db.exec("ALTER TABLE correspondences ADD COLUMN attachmentFileName TEXT");
@@ -171,6 +198,12 @@ export function initializeDatabase(): Database.Database {
   const hasAttachmentUploadedAt = correspondenceColumns.some((column) => column.name === "attachmentUploadedAt");
   if (!hasAttachmentUploadedAt) {
     db.exec("ALTER TABLE correspondences ADD COLUMN attachmentUploadedAt TEXT");
+  }
+
+  const assignmentColumns = db.prepare("PRAGMA table_info(correspondence_task_assignments)").all() as Array<{ name: string }>;
+  const hasAssignmentDescription = assignmentColumns.some((column) => column.name === "description");
+  if (!hasAssignmentDescription) {
+    db.exec("ALTER TABLE correspondence_task_assignments ADD COLUMN description TEXT");
   }
 
   return db;

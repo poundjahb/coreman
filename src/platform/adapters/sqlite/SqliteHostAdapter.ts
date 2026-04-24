@@ -39,6 +39,13 @@ export function createSqliteHostAdapter(
     branches: new SqliteBranchRepository(db),
     departments: new SqliteDepartmentRepository(db),
     actionDefinitions: new SqliteCorrespondenceActionDefinitionRepository(db),
+    taskAssignments: {
+      findById: () => notReady("taskAssignments.findById"),
+      findByCorrespondence: () => notReady("taskAssignments.findByCorrespondence"),
+      findByAssignee: () => notReady("taskAssignments.findByAssignee"),
+      save: () => notReady("taskAssignments.save"),
+      update: () => notReady("taskAssignments.update")
+    },
     referenceConfigs: new SqliteReferenceConfigRepository(db),
     smtpSettings,
     notifications,
@@ -91,6 +98,13 @@ export const sqliteHostAdapter: IHostAdapter = (() => {
       findActive: () => notReady("actionDefinitions.findActive"),
       save: () => notReady("actionDefinitions.save"),
       delete: () => notReady("actionDefinitions.delete")
+    },
+    taskAssignments: {
+      findById: () => notReady("taskAssignments.findById"),
+      findByCorrespondence: () => notReady("taskAssignments.findByCorrespondence"),
+      findByAssignee: () => notReady("taskAssignments.findByAssignee"),
+      save: () => notReady("taskAssignments.save"),
+      update: () => notReady("taskAssignments.update")
     },
     smtpSettings: {
       getConfig: () => notReady("smtpSettings.getConfig"),

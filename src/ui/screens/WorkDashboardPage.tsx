@@ -5,6 +5,7 @@ import {
   Button,
   Card,
   Container,
+  Drawer,
   Group,
   Menu,
   SimpleGrid,
@@ -20,13 +21,24 @@ import type { Correspondence } from "../../domain/correspondence";
 import { hasRole } from "../../application/services/accessControl";
 import { runtimeHostAdapter } from "../../platform/runtimeHostAdapter";
 import { CorrespondenceDetailsDrawerContainer } from "../components/CorrespondenceDetailsDrawerContainer";
+import { TaskAssignationPage } from "./TaskAssignationPage";
 
 interface WorkDashboardPageProps {
   currentUser: AppUser;
 }
 
+function formatDate(value: Date | undefined): string {
+  if (!value) {
+    return "-";
+  }
+
+  return value.toISOString().slice(0, 10);
+}
+
 export function WorkDashboardPage({ currentUser }: WorkDashboardPageProps): JSX.Element {
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [assignDrawerOpened, setAssignDrawerOpened] = useState(false);
+  const [assignCorrespondenceId, setAssignCorrespondenceId] = useState<string | null>(null);
   const [records, setRecords] = useState<Correspondence[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [usedFallbackScope, setUsedFallbackScope] = useState<boolean>(false);
@@ -65,6 +77,7 @@ export function WorkDashboardPage({ currentUser }: WorkDashboardPageProps): JSX.
         }
 
         setRecords(loaded);
+
       } catch (loadError) {
         if (!active) {
           return;
@@ -134,27 +147,35 @@ export function WorkDashboardPage({ currentUser }: WorkDashboardPageProps): JSX.
             </Text>
           )}
           <Table.ScrollContainer minWidth={980}>
-            <Table striped highlightOnHover verticalSpacing="sm">
+            <Table striped highlightOnHover verticalSpacing="xs">
               <Table.Thead>
                 <Table.Tr>
                   <Table.Th>Reference</Table.Th>
+                  <Table.Th>Organisation</Table.Th>
                   <Table.Th>Subject</Table.Th>
+                  <Table.Th>Date</Table.Th>
                   <Table.Th>Status</Table.Th>
-                  <Table.Th>Action Owner</Table.Th>
-                  <Table.Th>Actions</Table.Th>
+                  <Table.Th>Action</Table.Th>
                 </Table.Tr>
               </Table.Thead>
               <Table.Tbody>
                 {records.map((row) => (
                   <Table.Tr key={row.id}>
                     <Table.Td>
-                      <Anchor component="button" type="button" onClick={() => setSelectedId(row.id)}>
-                        {row.reference}
+                      <Anchor
+                        component="button"
+                        type="button"
+                        onClick={() => setSelectedId(row.id)}
+                        aria-label={`Open details for ${row.senderReference?.trim() || row.reference?.trim() || "-"}`}
+                        size="sm"
+                      >
+                        {row.senderReference?.trim() || "-"}
                       </Anchor>
                     </Table.Td>
-                    <Table.Td>{row.subject}</Table.Td>
-                    <Table.Td>{row.status}</Table.Td>
-                    <Table.Td>{row.actionOwnerId ?? "Unassigned"}</Table.Td>
+                    <Table.Td><Text size="sm">{row.organisation ?? "-"}</Text></Table.Td>
+                    <Table.Td><Text size="sm">{row.subject}</Text></Table.Td>
+                    <Table.Td><Text size="sm">{formatDate(row.correspondenceDate)}</Text></Table.Td>
+                    <Table.Td><Text size="sm">{row.status}</Text></Table.Td>
                     <Table.Td>
                       <Menu shadow="md" width={220}>
                         <Menu.Target>
@@ -162,7 +183,10 @@ export function WorkDashboardPage({ currentUser }: WorkDashboardPageProps): JSX.
                         </Menu.Target>
                         <Menu.Dropdown>
                           {isRecipient && (
-                            <Menu.Item component={Link} to="/tasks/assign">
+                            <Menu.Item onClick={() => {
+                              setAssignCorrespondenceId(row.id);
+                              setAssignDrawerOpened(true);
+                            }}>
                               Assign Task
                             </Menu.Item>
                           )}
@@ -187,6 +211,23 @@ export function WorkDashboardPage({ currentUser }: WorkDashboardPageProps): JSX.
           onClose={() => setSelectedId(null)}
           correspondence={selectedCorrespondence}
         />
+
+        <Drawer
+          opened={assignDrawerOpened}
+          onClose={() => {
+            setAssignDrawerOpened(false);
+            setAssignCorrespondenceId(null);
+          }}
+          position="right"
+          size="xl"
+          title="Task Assignation"
+          overlayProps={{ opacity: 0.25, blur: 2 }}
+        >
+          <TaskAssignationPage
+            correspondenceId={assignCorrespondenceId ?? undefined}
+            currentUser={currentUser}
+          />
+        </Drawer>
 
         <Card withBorder radius="md" p="md">
           <Group justify="space-between" mb="sm">

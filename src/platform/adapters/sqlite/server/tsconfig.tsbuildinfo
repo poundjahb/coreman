@@ -1,1 +1,1 @@
-{"root":["./src/db.ts","./src/index.ts","./src/routes/actiondefinitions.ts","./src/routes/branches.ts","./src/routes/departments.ts","./src/routes/other.ts","./src/routes/users.ts"],"version":"5.9.3"}
+{"root":["./src/db.ts","./src/index.ts","./src/routes/actiondefinitions.ts","./src/routes/assignments.ts","./src/routes/branches.ts","./src/routes/departments.ts","./src/routes/other.ts","./src/routes/users.ts"],"version":"5.9.3"}

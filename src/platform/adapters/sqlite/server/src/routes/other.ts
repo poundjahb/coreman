@@ -144,6 +144,8 @@ type CorrespondencePayload = {
   referenceNumber?: string;
   reference?: string;
   senderReference?: string;
+  fromTo?: string;
+  organisation?: string;
   branchId?: string;
   departmentId?: string;
   recipientId?: string;
@@ -535,6 +537,8 @@ export function registerOtherRoutes(router: Router, db: Database.Database): void
         referenceNumber,
         reference,
         senderReference,
+        fromTo,
+        organisation,
         branchId,
         departmentId,
         recipientId,
@@ -555,7 +559,7 @@ export function registerOtherRoutes(router: Router, db: Database.Database): void
       const resolvedUpdateBy = typeof updateBy === "object" ? updateBy?.id : updateBy;
       const hasRoutingTarget = Boolean(departmentId) || Boolean(recipientId);
 
-      if (!id || !resolvedReferenceNumber || !branchId || !direction || !status || !subject || !receivedDate || !hasRoutingTarget) {
+      if (!id || !resolvedReferenceNumber || !fromTo || !branchId || !direction || !status || !subject || !receivedDate || !hasRoutingTarget) {
         res.status(400).json({ error: "Missing required fields" });
         return;
       }
@@ -593,17 +597,19 @@ export function registerOtherRoutes(router: Router, db: Database.Database): void
 
       const stmt = db.prepare(`
         INSERT OR REPLACE INTO correspondences (
-          id, referenceNumber, senderReference, branchId, departmentId, recipientId, direction, status, subject,
+          id, referenceNumber, senderReference, fromTo, organisation, branchId, departmentId, recipientId, direction, status, subject,
           correspondenceDate, receivedDate, dueDate, createdAt, updatedAt,
           attachmentFileName, attachmentRelativePath, attachmentMimeType, attachmentSizeBytes, attachmentUploadedAt,
           createBy, updateBy
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
 
       stmt.run(
         id,
         resolvedReferenceNumber,
         senderReference || null,
+        fromTo,
+        organisation || null,
         branchId,
         normalizedDepartmentId,
         recipientId || null,

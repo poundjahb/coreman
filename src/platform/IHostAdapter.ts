@@ -11,6 +11,7 @@ import type { ISmtpSettingsService } from "./contracts/ISmtpSettingsService";
 import type { IEmailService } from "./contracts/IEmailService";
 import type { IUserRepository } from "./contracts/IUserRepository";
 import type { ICorrespondenceActionDefinitionRepository } from "./contracts/ICorrespondenceActionDefinitionRepository";
+import type { ICorrespondenceTaskAssignmentRepository } from "./contracts/ICorrespondenceTaskAssignmentRepository";
 
 export interface PlatformIndicator {
   target: PlatformTarget;
@@ -25,6 +26,7 @@ export interface IHostAdapter {
   branches: IBranchRepository;
   departments: IDepartmentRepository;
   actionDefinitions: ICorrespondenceActionDefinitionRepository;
+  taskAssignments: ICorrespondenceTaskAssignmentRepository;
   referenceConfigs: IReferenceConfigRepository;
   smtpSettings: ISmtpSettingsService;
   emailSettings: IEmailService;

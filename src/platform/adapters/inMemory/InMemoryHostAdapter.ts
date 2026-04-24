@@ -10,6 +10,7 @@ import {
 import type { IHostAdapter } from "../../IHostAdapter";
 import { InMemoryBranchRepository } from "./InMemoryBranchRepository";
 import { InMemoryCorrespondenceActionDefinitionRepository } from "./InMemoryCorrespondenceActionDefinitionRepository";
+import { InMemoryCorrespondenceTaskAssignmentRepository } from "./InMemoryCorrespondenceTaskAssignmentRepository";
 import { InMemoryCorrespondenceRepository } from "./InMemoryCorrespondenceRepository";
 import { InMemoryDepartmentRepository } from "./InMemoryDepartmentRepository";
 import { InMemoryNotificationService } from "./InMemoryNotificationService";
@@ -41,6 +42,7 @@ export function createInMemoryHostAdapter(): IHostAdapter {
     branches: new InMemoryBranchRepository(demoBranches),
     departments: new InMemoryDepartmentRepository(demoDepartments),
     actionDefinitions: new InMemoryCorrespondenceActionDefinitionRepository(demoActionDefinitions),
+    taskAssignments: new InMemoryCorrespondenceTaskAssignmentRepository(),
     referenceConfigs: new InMemoryReferenceConfigRepository(demoReferenceConfigs),
     smtpSettings,
     emailSettings,

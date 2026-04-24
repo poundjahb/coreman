@@ -1,12 +1,7 @@
 import { useEffect, useState } from "react";
-import { Anchor, Badge, Button, Divider, Drawer, Group, Modal, SimpleGrid, Stack, Text } from "@mantine/core";
+import { ActionIcon, Anchor, Badge, Divider, Drawer, Group, Modal, ScrollArea, SimpleGrid, Stack, Tabs, Text, Tooltip } from "@mantine/core";
 import { Download, Eye } from "lucide-react";
 import { PDFViewerInDrawer } from "./PDFViewerInDrawer";
-
-export interface CorrespondenceDetailField {
-  label: string;
-  value: string;
-}
 
 export interface CorrespondenceAttachmentLink {
   name: string;
@@ -15,23 +10,66 @@ export interface CorrespondenceAttachmentLink {
   sizeLabel?: string;
 }
 
+export interface CorrespondenceLinkedAction {
+  id: string;
+  label: string;
+  assignee: string;
+  deadline: string;
+  status: string;
+  description?: string;
+}
+
+export interface CorrespondenceAuditEntry {
+  id: string;
+  eventType: string;
+  status: string;
+  createdAt: string;
+  createdBy: string;
+  details?: string;
+}
+
 interface CorrespondenceDetailsDrawerProps {
   opened: boolean;
   onClose: () => void;
   reference: string;
   subject: string;
-  direction?: string;
   status?: string;
-  fields: CorrespondenceDetailField[];
+  summary?: string;
+  sender?: string;
+  organisation?: string;
+  correspondenceDate?: string;
+  receivedDate?: string;
+  dueDate?: string;
+  receivedBy?: string;
+  recipient?: string;
+  branch?: string;
+  department?: string;
   attachments?: CorrespondenceAttachmentLink[];
-}
-
-function getDirectionColor(direction: string): string {
-  return direction.toUpperCase().includes("INCOMING") ? "blue" : "teal";
+  actions?: CorrespondenceLinkedAction[];
+  audits?: CorrespondenceAuditEntry[];
 }
 
 export function CorrespondenceDetailsDrawer(props: CorrespondenceDetailsDrawerProps): JSX.Element {
-  const { opened, onClose, reference, subject, direction, status, fields, attachments } = props;
+  const {
+    opened,
+    onClose,
+    reference,
+    subject,
+    status,
+    summary,
+    sender,
+    organisation,
+    correspondenceDate,
+    receivedDate,
+    dueDate,
+    receivedBy,
+    recipient,
+    branch,
+    department,
+    attachments,
+    actions,
+    audits
+  } = props;
   const [previewAttachment, setPreviewAttachment] = useState<CorrespondenceAttachmentLink | null>(null);
 
   useEffect(() => {
@@ -55,72 +93,168 @@ export function CorrespondenceDetailsDrawer(props: CorrespondenceDetailsDrawerPr
         title="Correspondence Details"
         overlayProps={{ opacity: 0.25, blur: 2 }}
       >
-        <Stack gap="md">
-          <div>
-            <Text size="xs" c="dimmed" tt="uppercase" fw={600}>Reference</Text>
-            <Text fw={600}>{reference}</Text>
-          </div>
+        <Tabs defaultValue="correspondence">
+          <Tabs.List>
+            <Tabs.Tab value="correspondence">Correspondence</Tabs.Tab>
+            <Tabs.Tab value="actions">Actions</Tabs.Tab>
+            <Tabs.Tab value="audit">Audit</Tabs.Tab>
+          </Tabs.List>
 
-          <div>
-            <Text size="xs" c="dimmed" tt="uppercase" fw={600}>Subject</Text>
-            <Text>{subject}</Text>
-          </div>
+          <Tabs.Panel value="correspondence" pt="md">
+            <Stack gap="md">
+              <SimpleGrid cols={2} spacing="md" verticalSpacing="sm">
+                <div>
+                  <Text size="xs" c="dimmed" tt="uppercase" fw={600}>Reference</Text>
+                  <Text fw={600}>{reference || "-"}</Text>
+                </div>
+                <div>
+                  <Text size="xs" c="dimmed" tt="uppercase" fw={600}>Status</Text>
+                  {status ? <Badge variant="light">{status}</Badge> : <Text size="sm">-</Text>}
+                </div>
+              </SimpleGrid>
 
-          {(direction || status) && (
-            <Group gap="xs">
-              {direction && (
-                <Badge variant="light" color={getDirectionColor(direction)}>
-                  {direction}
-                </Badge>
-              )}
-              {status && <Badge variant="light">{status}</Badge>}
-            </Group>
-          )}
-
-          <Divider />
-
-          <SimpleGrid cols={2} spacing="md" verticalSpacing="sm">
-            {fields.map((field) => (
-              <div key={field.label}>
-                <Text size="xs" c="dimmed" tt="uppercase" fw={600}>{field.label}</Text>
-                <Text size="sm">{field.value || "-"}</Text>
+              <div>
+                <Text size="xs" c="dimmed" tt="uppercase" fw={600}>Subject</Text>
+                <Text size="sm">{subject || "-"}</Text>
               </div>
-            ))}
-          </SimpleGrid>
 
-          <Divider />
+              <div>
+                <Text size="xs" c="dimmed" tt="uppercase" fw={600}>Summary</Text>
+                <Text size="sm">{summary || "-"}</Text>
+              </div>
 
-          <Stack gap="xs">
-            <Text size="xs" c="dimmed" tt="uppercase" fw={600}>Attachments</Text>
-            {attachments && attachments.length > 0 ? (
-              attachments.map((attachment) => (
-                <Group key={`${attachment.name}-${attachment.url}`} gap="xs" justify="space-between" align="center">
-                  <Text size="sm" style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {attachment.name}{attachment.sizeLabel ? ` (${attachment.sizeLabel})` : ""}
-                  </Text>
-                  <Group gap={4} wrap="nowrap">
-                    {attachment.previewUrl && (
-                      <Button
-                        variant="subtle"
-                        size="xs"
-                        leftSection={<Eye size={14} />}
-                        onClick={() => setPreviewAttachment(attachment)}
-                      >
-                        Open
-                      </Button>
-                    )}
-                    <Anchor href={attachment.url} download={attachment.name} style={{ display: "flex", alignItems: "center", gap: 4, fontSize: "var(--mantine-font-size-xs)" }}>
-                      <Download size={14} />
-                      Download
-                    </Anchor>
-                  </Group>
-                </Group>
-              ))
-            ) : (
-              <Text size="sm" c="dimmed">No attachments</Text>
-            )}
-          </Stack>
-        </Stack>
+              <SimpleGrid cols={2} spacing="md" verticalSpacing="sm">
+                <div>
+                  <Text size="xs" c="dimmed" tt="uppercase" fw={600}>Sender</Text>
+                  <Text size="sm">{sender || "-"}</Text>
+                </div>
+                <div>
+                  <Text size="xs" c="dimmed" tt="uppercase" fw={600}>Organisation</Text>
+                  <Text size="sm">{organisation || "-"}</Text>
+                </div>
+              </SimpleGrid>
+
+              <SimpleGrid cols={3} spacing="md" verticalSpacing="sm">
+                <div>
+                  <Text size="xs" c="dimmed" tt="uppercase" fw={600}>Correspondence Date</Text>
+                  <Text size="sm">{correspondenceDate || "-"}</Text>
+                </div>
+                <div>
+                  <Text size="xs" c="dimmed" tt="uppercase" fw={600}>Receive Date</Text>
+                  <Text size="sm">{receivedDate || "-"}</Text>
+                </div>
+                <div>
+                  <Text size="xs" c="dimmed" tt="uppercase" fw={600}>Due Date</Text>
+                  <Text size="sm">{dueDate || "-"}</Text>
+                </div>
+              </SimpleGrid>
+
+              <SimpleGrid cols={2} spacing="md" verticalSpacing="sm">
+                <div>
+                  <Text size="xs" c="dimmed" tt="uppercase" fw={600}>Received By</Text>
+                  <Text size="sm">{receivedBy || "-"}</Text>
+                </div>
+                <div>
+                  <Text size="xs" c="dimmed" tt="uppercase" fw={600}>Recipient</Text>
+                  <Text size="sm">{recipient || "-"}</Text>
+                </div>
+              </SimpleGrid>
+
+              <SimpleGrid cols={2} spacing="md" verticalSpacing="sm">
+                <div>
+                  <Text size="xs" c="dimmed" tt="uppercase" fw={600}>Branch</Text>
+                  <Text size="sm">{branch || "-"}</Text>
+                </div>
+                <div>
+                  <Text size="xs" c="dimmed" tt="uppercase" fw={600}>Department</Text>
+                  <Text size="sm">{department || "-"}</Text>
+                </div>
+              </SimpleGrid>
+
+              <Divider />
+
+              <Stack gap="xs">
+                <Text size="xs" c="dimmed" tt="uppercase" fw={600}>Attachments</Text>
+                {attachments && attachments.length > 0 ? (
+                  attachments.map((attachment) => (
+                    <Group key={`${attachment.name}-${attachment.url}`} gap="xs" justify="space-between" align="center">
+                      <Text size="sm" style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {attachment.name}{attachment.sizeLabel ? ` (${attachment.sizeLabel})` : ""}
+                      </Text>
+                      <Group gap={6} wrap="nowrap">
+                        {attachment.previewUrl && (
+                          <Tooltip label="View">
+                            <ActionIcon
+                              variant="light"
+                              size="sm"
+                              onClick={() => setPreviewAttachment(attachment)}
+                              aria-label={`View ${attachment.name}`}
+                            >
+                              <Eye size={14} />
+                            </ActionIcon>
+                          </Tooltip>
+                        )}
+                        <Anchor href={attachment.url} download={attachment.name} aria-label={`Download ${attachment.name}`}>
+                          <Tooltip label="Download">
+                            <ActionIcon variant="light" size="sm" component="span">
+                              <Download size={14} />
+                            </ActionIcon>
+                          </Tooltip>
+                        </Anchor>
+                      </Group>
+                    </Group>
+                  ))
+                ) : (
+                  <Text size="sm" c="dimmed">No attachments</Text>
+                )}
+              </Stack>
+            </Stack>
+          </Tabs.Panel>
+
+          <Tabs.Panel value="actions" pt="md">
+            <ScrollArea.Autosize mah={520}>
+              <Stack gap="sm">
+                {actions && actions.length > 0 ? (
+                  actions.map((action) => (
+                    <Stack key={action.id} gap={4} p="sm" style={{ border: "1px solid var(--mantine-color-gray-3)", borderRadius: 8 }}>
+                      <Group justify="space-between" align="start">
+                        <Text fw={600} size="sm">{action.label}</Text>
+                        <Badge variant="light">{action.status}</Badge>
+                      </Group>
+                      <Text size="xs" c="dimmed">Assignee: {action.assignee}</Text>
+                      <Text size="xs" c="dimmed">Deadline: {action.deadline || "-"}</Text>
+                      {action.description && <Text size="sm">{action.description}</Text>}
+                    </Stack>
+                  ))
+                ) : (
+                  <Text size="sm" c="dimmed">No linked actions.</Text>
+                )}
+              </Stack>
+            </ScrollArea.Autosize>
+          </Tabs.Panel>
+
+          <Tabs.Panel value="audit" pt="md">
+            <ScrollArea.Autosize mah={520}>
+              <Stack gap="sm">
+                {audits && audits.length > 0 ? (
+                  audits.map((audit) => (
+                    <Stack key={audit.id} gap={4} p="sm" style={{ border: "1px solid var(--mantine-color-gray-3)", borderRadius: 8 }}>
+                      <Group justify="space-between" align="start">
+                        <Text fw={600} size="sm">{audit.eventType}</Text>
+                        <Badge variant="light" color={audit.status === "FAILED" ? "red" : "green"}>{audit.status}</Badge>
+                      </Group>
+                      <Text size="xs" c="dimmed">At: {audit.createdAt}</Text>
+                      <Text size="xs" c="dimmed">By: {audit.createdBy}</Text>
+                      {audit.details && <Text size="sm">{audit.details}</Text>}
+                    </Stack>
+                  ))
+                ) : (
+                  <Text size="sm" c="dimmed">No audit entries.</Text>
+                )}
+              </Stack>
+            </ScrollArea.Autosize>
+          </Tabs.Panel>
+        </Tabs>
       </Drawer>
 
       <Modal

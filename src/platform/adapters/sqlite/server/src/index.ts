@@ -5,6 +5,7 @@ import { registerBranchesRoutes } from "./routes/branches.js";
 import { registerDepartmentsRoutes } from "./routes/departments.js";
 import { registerUsersRoutes } from "./routes/users.js";
 import { registerActionDefinitionsRoutes } from "./routes/actionDefinitions.js";
+import { registerAssignmentsRoutes } from "./routes/assignments.js";
 import { registerOtherRoutes } from "./routes/other.js";
 
 const app = express();
@@ -26,6 +27,7 @@ registerBranchesRoutes(router, db);
 registerDepartmentsRoutes(router, db);
 registerUsersRoutes(router, db);
 registerActionDefinitionsRoutes(router, db);
+registerAssignmentsRoutes(router, db);
 registerOtherRoutes(router, db);
 
 // Mount router

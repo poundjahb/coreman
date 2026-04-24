@@ -11,6 +11,7 @@ import type { ISmtpSettingsService } from "../../contracts/ISmtpSettingsService"
 import type { IEmailService } from "../../contracts/IEmailService";
 import type { SequenceStore } from "../../../domain/reference";
 import type { ICorrespondenceActionDefinitionRepository } from "../../contracts/ICorrespondenceActionDefinitionRepository";
+import type { ICorrespondenceTaskAssignmentRepository } from "../../contracts/ICorrespondenceTaskAssignmentRepository";
 import { buildPlatformIndicator } from "../../platformIndicator";
 
 export const dataversePlatformIndicator = buildPlatformIndicator({
@@ -67,6 +68,14 @@ const dataverseActionDefinitionRepository: ICorrespondenceActionDefinitionReposi
   delete: (_id) => notImplemented("actionDefinitions.delete")
 };
 
+const dataverseTaskAssignmentRepository: ICorrespondenceTaskAssignmentRepository = {
+  findById: (_id) => notImplemented("taskAssignments.findById"),
+  findByCorrespondence: (_correspondenceId) => notImplemented("taskAssignments.findByCorrespondence"),
+  findByAssignee: (_assigneeUserId) => notImplemented("taskAssignments.findByAssignee"),
+  save: (_assignment) => notImplemented("taskAssignments.save"),
+  update: (_id, _changes) => notImplemented("taskAssignments.update")
+};
+
 const dataverseNotificationService: INotificationService = {
   send: (_payload: NotificationPayload) => notImplemented("notifications.send")
 };
@@ -104,6 +113,7 @@ export const dataverseHostAdapter: IHostAdapter = {
   branches: dataverseBranchRepository,
   departments: dataverseDepartmentRepository,
   actionDefinitions: dataverseActionDefinitionRepository,
+  taskAssignments: dataverseTaskAssignmentRepository,
   referenceConfigs: dataverseReferenceConfigRepository,
   smtpSettings: dataverseSmtpSettings,
   emailSettings: dataverseEmailSettings,

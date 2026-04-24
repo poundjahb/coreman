@@ -1,104 +1,106 @@
 # Correspondence Management App
 
-Initial implementation baseline for a Power Platform-oriented correspondence management application using TypeScript and Vite.
+Correspondence Management is a React + TypeScript application built with Vite and a host-adapter architecture.
+In day-to-day development, the app runs in SERVER mode with a Node/Express backend and SQLite persistence.
 
-## Current Implementation Status
+## Current Status
 
-### Implemented now
-- Project scaffold files for Vite + React + TypeScript.
-- Foundation domain models for governance and user roles.
-- Authentication mode exclusivity guard for APP and ENTRA modes.
-- Explicit-user validation guard (registered, active, login-allowed).
-- Access control helper functions.
-- In-app configurable reference engine with scope precedence:
-  - Branch + Department
-  - Branch
-  - Global
-- Reference sequence rendering with token support:
-  - ORG, BRANCH, DEPT, YYYY, YY, MM, DD, SEQn
-- Intake module baseline that generates references in-app for receptionist flow.
+### Implemented
+- Role-aware UI flows for receptionist, recipient/action owner, dashboard viewer, and admin users.
+- Four-layer structure:
+  - `src/ui` for screens/components
+  - `src/application` for use cases/services
+  - `src/domain` for entities and rules
+  - `src/platform` for adapters/contracts
+- Runtime platform targeting (`SERVER`, `SQLITE`, `IN_MEMORY`, `DATAVERSE`) via `VITE_PLATFORM_TARGET`.
+- Host adapter factory and runtime adapter wiring.
+- In-app reference generation with precedence (branch+department, branch, global) and tokenized sequences.
+- Startup bootstrap of core records (branch/department/admin user) when needed.
+- Correspondence registration and repository-backed listing/search/history/dashboard views.
+- Attachment upload (single-file MVP) at registration time in SERVER+SQLite mode.
+- Attachment storage and metadata persistence in SQLite server mode.
+- Attachment download endpoint and inline preview endpoint.
+- Correspondence details drawer with attachment actions:
+  - PDF files: open in large modal viewer.
+  - Non-PDF files: download.
+- PDF preview with pagination and zoom controls (zoom in/out/reset).
 
-### Implemented now (continued)
-- **Platform Abstraction Layer (PAL) — Step 1 structural scaffold:**
-  - `src/domain/correspondence.ts` — Correspondence domain entity with direction and status enums.
-  - `src/platform/contracts/` — Repository and service contracts:
-    - `ICorrespondenceRepository`, `IUserRepository`, `IBranchRepository`, `IDepartmentRepository`
-    - `IReferenceConfigRepository`, `INotificationService`
-  - `src/platform/IHostAdapter.ts` — Aggregated host adapter interface.
-  - `src/platform/adapters/inMemory/` — Fully wired in-memory adapter backed by seed data.
-  - `src/platform/adapters/dataverse/` — Dataverse adapter stub (raises not-implemented errors).
-  - `src/platform/adapters/sqlite/` — SQLite adapter stub (raises not-implemented errors).
-  - `src/platform/hostAdapterFactory.ts` — Factory that selects the adapter from `PlatformConfig`.
-  - `src/config/systemConfig.ts` — Extended with `PlatformTarget` type and `platformConfig`.
-- **Four-Layer Architecture — folder structure enforced:**
-  - `src/ui/` (Layer 1) — React components (`src/ui/components/`), page screens (`src/ui/screens/`), and UI mock data (`src/ui/mocks/`).
-  - `src/application/` (Layer 2) — Application logic: auth guards (`src/application/auth/`), domain use-case modules (`src/application/modules/`), and pure services (`src/application/services/`).
-  - `src/domain/` (Layer 3) — Domain entities and value objects (unchanged).
-  - `src/platform/` (Layer 4) — Host abstraction, repository contracts, and adapter implementations (unchanged).
+### Not Yet Implemented / Partial
+- Dataverse adapter operations are still stubbed and raise not-implemented errors.
+- Electron main/preload packaging is not the active runtime path for current dev flow.
+- Advanced task queue backend integration is still pending.
 
-### Not yet implemented
-- Dataverse repository implementations (replace stubs).
-- SQLite repository implementations (replace stubs).
-- Power Automate flow triggers.
-- Scheduler-based deadline monitoring flow integration.
-- Complete action lifecycle UI and APIs.
-- Dashboard modules.
+## Runtime Modes
 
-## Phase Completion Criteria
+- `SERVER`: Frontend (Vite) + backend API.
+- `SQLITE`: Convenience launcher that runs SERVER mode with SQLite provider env.
+- `IN_MEMORY`: Frontend using in-memory adapter.
+- `DATAVERSE`: Frontend using Dataverse adapter stubs.
 
-### Phase 0 completion criteria
-- Power Platform environment connectivity validated.
-- Deployment identity and connector permissions validated.
-- Baseline ALM deployment path to Dev/Test validated.
+## Local Development (Windows)
 
-### Phase 1 completion criteria
-- Only explicit active users can authenticate.
-- Admin governance model and roles defined in domain model.
-- Authentication mode exclusivity guard implemented.
+Prerequisites:
+- Node.js LTS
+- npm
 
-### Phase 2 completion criteria
-- In-app reference generation implemented with configurable precedence.
-- Reference uniqueness strategy defined for atomic counter backend.
-- Intake workflow persists correspondence and document attachments.
-
-## Local Run Prerequisite
-Node.js and npm are required but currently unavailable in this machine session. After installing Node LTS:
+Install dependencies from repository root:
 
 ```powershell
 npm install
-cd .\scripts
-
-# SERVER (browser + centralized API expected)
-.\start-server.ps1
-
-# SQLITE (server mode + sqlite provider intent, development only)
-.\start-sqlite.ps1
-
-# IN_MEMORY (Vite web mode)
-.\start-inmemory.ps1
-
-# DATAVERSE (Vite web mode)
-.\start-dataverse.ps1
 ```
 
-Optional dispatcher scripts (default target is SERVER):
+Recommended run command (from `scripts`):
 
 ```powershell
+cd .\scripts
+.\start-sqlite.ps1
+```
+
+This starts:
+- Frontend: http://localhost:5173
+- Backend: http://localhost:3001
+
+Other launchers:
+
+```powershell
+cd .\scripts
+
+.\start-server.ps1
+.\start-inmemory.ps1
+.\start-dataverse.ps1
+
+# Dispatcher
 .\start.ps1 -Platform SERVER
 .\start.ps1 -Platform SQLITE
 .\start.ps1 -Platform IN_MEMORY
 .\start.ps1 -Platform DATAVERSE
 ```
 
-Stop commands:
+Stop scripts:
 
 ```powershell
+cd .\scripts
+
+.\stop-server.ps1
 .\stop-sqlite.ps1
 .\stop-inmemory.ps1
 .\stop-dataverse.ps1
 ```
 
-The active platform is also exposed to the renderer with `VITE_PLATFORM_TARGET` and shown in the app header by a generated icon produced by each platform adapter.
+## Notes on Attachments and PDF Preview
 
-## Next Implementation Target
-- Implement Phase 2 persistence adapters (Dataverse repositories) and API contracts for app-triggered notification flows.
+- Upload constraints currently enforced in SQLite server route layer:
+  - single file
+  - max size 10 MB
+  - allowed MIME types: PDF, PNG, JPEG, TIFF
+- Files are stored under the SQLite server data folder and linked via correspondence metadata.
+- Preview route serves inline content for supported PDF rendering in the modal viewer.
+
+## Testing and Build
+
+From repository root:
+
+```powershell
+npm test
+npm run build
+```

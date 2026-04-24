@@ -31,6 +31,9 @@ export function createIpcHostAdapter(): IHostAdapter {
   // This ensures we fail fast and explicitly if run outside Electron, rather than
   // silently degrading or failing later during actual IPC calls.
   const api = getElectronAPI();
+  async function taskAssignmentsNotReady<T>(method: string): Promise<T> {
+    throw new Error(`IPC taskAssignments.${method} is not implemented in electronAPI yet.`);
+  }
   return {
     platform: sqlitePlatformIndicator,
     correspondences: {
@@ -65,6 +68,13 @@ export function createIpcHostAdapter(): IHostAdapter {
       findActive: () => api.actionDefinitions.findActive(),
       save: (definition) => api.actionDefinitions.save(definition),
       delete: (id) => api.actionDefinitions.delete(id)
+    },
+    taskAssignments: {
+      findById: (id) => taskAssignmentsNotReady(`findById(${id})`),
+      findByCorrespondence: (correspondenceId) => taskAssignmentsNotReady(`findByCorrespondence(${correspondenceId})`),
+      findByAssignee: (assigneeUserId) => taskAssignmentsNotReady(`findByAssignee(${assigneeUserId})`),
+      save: () => taskAssignmentsNotReady("save"),
+      update: () => taskAssignmentsNotReady("update")
     },
     referenceConfigs: {
       findAll: () => api.referenceConfigs.findAll(),

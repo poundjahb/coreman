@@ -1,6 +1,6 @@
 import type { SmtpConfig } from "../../../config/systemConfig";
 import type { Correspondence } from "../../../domain/correspondence";
-import type { CorrespondenceActionDefinition } from "../../../domain/correspondenceAction";
+import type { CorrespondenceActionDefinition, CorrespondenceTaskAssignment } from "../../../domain/correspondenceAction";
 import type { Branch, Department, AppUser } from "../../../domain/governance";
 import type { ReferenceFormatConfig } from "../../../domain/reference";
 import type { IHostAdapter } from "../../IHostAdapter";
@@ -80,6 +80,15 @@ function hydrateCorrespondence(raw: Correspondence): Correspondence {
 function hydrateActionDefinition(raw: CorrespondenceActionDefinition): CorrespondenceActionDefinition {
   return {
     ...raw,
+    createdAt: new Date(raw.createdAt),
+    updatedAt: new Date(raw.updatedAt)
+  };
+}
+
+function hydrateTaskAssignment(raw: CorrespondenceTaskAssignment): CorrespondenceTaskAssignment {
+  return {
+    ...raw,
+    deadline: new Date(raw.deadline),
     createdAt: new Date(raw.createdAt),
     updatedAt: new Date(raw.updatedAt)
   };
@@ -219,6 +228,44 @@ export function createHttpHostAdapter(options: HttpHostAdapterOptions = {}): IHo
       save: (definition: CorrespondenceActionDefinition): Promise<void> =>
         requestJson<void>(apiBaseUrl, "/api/action-definitions", "POST", definition),
       delete: (id: string): Promise<void> => requestJson<void>(apiBaseUrl, `/api/action-definitions/${id}`, "DELETE")
+    },
+    taskAssignments: {
+      async findById(id: string): Promise<CorrespondenceTaskAssignment | null> {
+        const payload = await requestJson<CorrespondenceTaskAssignment | null>(apiBaseUrl, `/api/assignments/${id}`, "GET");
+        return payload ? hydrateTaskAssignment(payload) : null;
+      },
+      async findByCorrespondence(correspondenceId: string): Promise<CorrespondenceTaskAssignment[]> {
+        const payload = await requestJson<CorrespondenceTaskAssignment[]>(
+          apiBaseUrl,
+          `/api/correspondences/${correspondenceId}/assignments`,
+          "GET"
+        );
+        return payload.map(hydrateTaskAssignment);
+      },
+      async findByAssignee(assigneeUserId: string): Promise<CorrespondenceTaskAssignment[]> {
+        const payload = await requestJson<CorrespondenceTaskAssignment[]>(
+          apiBaseUrl,
+          "/api/assignments",
+          "GET",
+          undefined,
+          { assigneeUserId }
+        );
+        return payload.map(hydrateTaskAssignment);
+      },
+      async save(assignment: CorrespondenceTaskAssignment): Promise<void> {
+        await requestJson<void>(
+          apiBaseUrl,
+          `/api/correspondences/${assignment.correspondenceId}/assignments`,
+          "POST",
+          assignment
+        );
+      },
+      async update(
+        id: string,
+        changes: Partial<Omit<CorrespondenceTaskAssignment, "id" | "createdAt" | "createdBy">>
+      ): Promise<void> {
+        await requestJson<void>(apiBaseUrl, `/api/assignments/${id}`, "PATCH", changes);
+      }
     },
     referenceConfigs: {
       findAll: (): Promise<ReferenceFormatConfig[]> =>

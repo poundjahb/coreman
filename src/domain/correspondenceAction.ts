@@ -6,6 +6,12 @@ export type ActionWorkflowMethod = "POST" | "PUT";
 
 export type ActionWorkflowAuthType = "NONE" | "API_KEY" | "BEARER_TOKEN_REF";
 
+export type CorrespondenceTaskAssignmentStatus =
+  | "ASSIGNED"
+  | "IN_PROGRESS"
+  | "COMPLETED"
+  | "CANCELED";
+
 export interface CorrespondenceActionDefinition {
   id: string;
   code: string;
@@ -27,4 +33,19 @@ export interface CorrespondenceActionDefinition {
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
+}
+
+export interface CorrespondenceTaskAssignment {
+  id: string;
+  correspondenceId: string;
+  actionDefinitionId: string;
+  description?: string;
+  assigneeUserId: string;
+  ccUserIds: string[];
+  deadline: Date;
+  status: CorrespondenceTaskAssignmentStatus;
+  createdAt: Date;
+  updatedAt: Date;
+  createdBy: string;
+  updatedBy: string;
 }
