@@ -125,11 +125,11 @@ export class SqliteCorrespondenceRepository implements ICorrespondenceRepository
     this.db
       .prepare(
         `INSERT OR REPLACE INTO correspondences
-          (id, reference, subject, direction, fromTo, organisation, correspondenceDate, branchId,
+          (id, reference, senderReference, subject, direction, fromTo, organisation, correspondenceDate, branchId,
            departmentId, registeredById, recipientId, actionOwnerId, status, receivedDate,
            dueDate, createdAt, updatedAt, createById, updateById, summary)
          VALUES
-          (@id, @reference, @subject, @direction, @fromTo, @organisation, @correspondenceDate,
+          (@id, @reference, @senderReference, @subject, @direction, @fromTo, @organisation, @correspondenceDate,
            @branchId, @departmentId, @registeredById, @recipientId, @actionOwnerId, @status,
            @receivedDate, @dueDate, @createdAt, @updatedAt, @createById, @updateById, @summary)`
       )

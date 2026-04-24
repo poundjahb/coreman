@@ -54,8 +54,10 @@ export function initializeDatabase(): Database.Database {
     CREATE TABLE IF NOT EXISTS correspondences (
       id TEXT PRIMARY KEY,
       referenceNumber TEXT NOT NULL UNIQUE,
+      senderReference TEXT,
       branchId TEXT NOT NULL,
-      departmentId TEXT NOT NULL,
+      departmentId TEXT,
+      recipientId TEXT,
       direction TEXT NOT NULL,
       status TEXT NOT NULL,
       subject TEXT NOT NULL,
@@ -129,6 +131,17 @@ export function initializeDatabase(): Database.Database {
       updatedAt TEXT NOT NULL
     );
   `);
+
+  const correspondenceColumns = db.prepare("PRAGMA table_info(correspondences)").all() as Array<{ name: string }>;
+  const hasSenderReference = correspondenceColumns.some((column) => column.name === "senderReference");
+  if (!hasSenderReference) {
+    db.exec("ALTER TABLE correspondences ADD COLUMN senderReference TEXT");
+  }
+
+  const hasRecipientId = correspondenceColumns.some((column) => column.name === "recipientId");
+  if (!hasRecipientId) {
+    db.exec("ALTER TABLE correspondences ADD COLUMN recipientId TEXT");
+  }
 
   return db;
 }

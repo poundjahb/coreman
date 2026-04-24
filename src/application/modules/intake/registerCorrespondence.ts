@@ -8,6 +8,7 @@ import { assertRole } from "../../services/accessControl";
 import {
   generateReference,
   generateReferenceAsync,
+  generateFallbackReferenceAsync,
   InMemorySequenceStore
 } from "../../services/referenceEngine";
 
@@ -31,6 +32,8 @@ export interface RegisterCorrespondenceCommand {
   departmentId?: string;
   subject: string;
   direction?: Correspondence["direction"];
+  /** Sender-provided external reference (incoming correspondence), optional. */
+  senderReference?: string;
   /** Sender (INCOMING) or recipient (OUTGOING) — required */
   fromTo: string;
   /** Organisation of the sender or recipient — optional */
@@ -107,12 +110,6 @@ export async function registerCorrespondenceInHost(
     throw new Error("The selected department is not allowed for this branch.");
   }
 
-  if (configs.length === 0) {
-    throw new Error(
-      "System setup is incomplete: configure at least one active reference format before registering correspondence."
-    );
-  }
-
   const userIds = new Set(users.map((user) => user.id));
   if (!userIds.has(actor.id)) {
     throw new Error("The registering user could not be found.");
@@ -127,26 +124,38 @@ export async function registerCorrespondenceInHost(
   }
 
   const now = new Date();
-  const generated = await generateReferenceAsync(configs, {
-    orgCode,
-    branchId: input.branchId,
-    branchCode: branch.code,
-    departmentId: input.departmentId,
-    departmentCode: department?.code,
-    now
-  }, async (key) => {
+  const senderReference = input.senderReference?.trim() || undefined;
+  const nextSequence = async (key: string): Promise<number> => {
     if (typeof window !== "undefined" && window.electronAPI) {
       return window.electronAPI.sequenceStore.next(key);
     }
 
     return Promise.resolve(hostAdapter.sequenceStore.next(key));
-  });
+  };
+
+  let resolvedReference: string;
+  if (senderReference) {
+    resolvedReference = senderReference;
+  } else if (configs.length > 0) {
+    const generated = await generateReferenceAsync(configs, {
+      orgCode,
+      branchId: input.branchId,
+      branchCode: branch.code,
+      departmentId: input.departmentId,
+      departmentCode: department?.code,
+      now
+    }, nextSequence);
+    resolvedReference = generated.value;
+  } else {
+    resolvedReference = await generateFallbackReferenceAsync(orgCode, now, nextSequence);
+  }
 
   const timestamp = now.toISOString();
   const receivedDate = new Date(`${timestamp.slice(0, 10)}T00:00:00.000Z`);
   const correspondence: Correspondence = {
     id: crypto.randomUUID(),
-    reference: generated.value,
+    reference: resolvedReference,
+    senderReference,
     subject: input.subject.trim(),
     direction: input.direction ?? "INCOMING",
     fromTo: input.fromTo,

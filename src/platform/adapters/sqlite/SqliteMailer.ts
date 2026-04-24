@@ -1,4 +1,5 @@
 import nodemailer from "nodemailer";
+import type { SmtpConfig } from "../../../config/systemConfig";
 
 export interface SqliteMailMessage {
   to: string;
@@ -16,28 +17,54 @@ export interface ISqliteMailer {
  */
 export class NodemailerSqliteMailer {
   private readonly transport: nodemailer.Transporter;
+  private readonly defaultFromAddress?: string;
 
   constructor(
-    private readonly smtpHost: string,
-    private readonly smtpPort: number,
-    private readonly smtpSecure: boolean,
-    private readonly smtpUser: string | undefined,
-    private readonly smtpPass: string | undefined,
-    private readonly connectionTimeoutMs: number
+    config: SmtpConfig
+  );
+  constructor(
+    smtpHost: string,
+    smtpPort: number,
+    smtpSecure: boolean,
+    smtpUser: string | undefined,
+    smtpPass: string | undefined,
+    connectionTimeoutMs: number
+  );
+  constructor(
+    arg1: SmtpConfig | string,
+    arg2?: number,
+    arg3?: boolean,
+    arg4?: string | undefined,
+    arg5?: string | undefined,
+    arg6?: number
   ) {
-    this.transport = nodemailer.createTransport({
-      host: smtpHost,
-      port: smtpPort,
-      secure: smtpSecure,
-      auth: smtpUser && smtpPass
+    const resolved: SmtpConfig =
+      typeof arg1 === "string"
         ? {
-          user: smtpUser,
-          pass: smtpPass
+          host: arg1,
+          port: arg2 ?? 25,
+          secure: arg3 ?? false,
+          user: arg4,
+          pass: arg5,
+          fromAddress: "",
+          connectionTimeoutMs: arg6 ?? 5000
+        }
+        : arg1;
+
+    this.defaultFromAddress = resolved.fromAddress;
+    this.transport = nodemailer.createTransport({
+      host: resolved.host,
+      port: resolved.port,
+      secure: resolved.secure,
+      auth: resolved.user && resolved.pass
+        ? {
+          user: resolved.user,
+          pass: resolved.pass
         }
         : undefined,
-      connectionTimeout: connectionTimeoutMs,
-      greetingTimeout: connectionTimeoutMs,
-      socketTimeout: connectionTimeoutMs
+      connectionTimeout: resolved.connectionTimeoutMs,
+      greetingTimeout: resolved.connectionTimeoutMs,
+      socketTimeout: resolved.connectionTimeoutMs
     });
   }
 
@@ -69,6 +96,10 @@ export class NodemailerSqliteMailer {
   }
 
   async send(message: SqliteMailMessage): Promise<void> {
-    throw new Error("Use sendMail() instead of send() for new code");
+    if (!this.defaultFromAddress) {
+      throw new Error("From address is required when using send(). Use sendMail() or provide SmtpConfig with fromAddress.");
+    }
+
+    await this.sendMail(this.defaultFromAddress, message.to, message.subject, message.text);
   }
 }

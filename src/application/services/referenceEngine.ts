@@ -81,6 +81,21 @@ export function renderPattern(
   });
 }
 
+export async function generateFallbackReferenceAsync(
+  orgCode: string,
+  now: Date,
+  nextSequence: (key: string) => Promise<number>
+): Promise<string> {
+  const day = String(now.getUTCDate()).padStart(2, "0");
+  const month = String(now.getUTCMonth() + 1).padStart(2, "0");
+  const year = String(now.getUTCFullYear()).slice(-2);
+  const datePart = `${day}${month}${year}`;
+  const scopeKey = `FALLBACK|${orgCode}|${datePart}`;
+  const sequence = await nextSequence(scopeKey);
+
+  return `${orgCode}${sequence}/${datePart}`;
+}
+
 export function generateReference(
   configs: ReferenceFormatConfig[],
   context: ReferenceContext,

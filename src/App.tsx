@@ -338,10 +338,6 @@ export function App(): JSX.Element {
           issues.push("At least one active department is required.");
         }
 
-        if (referenceConfigs.length === 0) {
-          issues.push("At least one active reference format is required.");
-        }
-
         issues.push(...bootstrapResult.issues);
 
         setAvailableUsers(loginUsers);

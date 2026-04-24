@@ -342,21 +342,81 @@ export function registerOtherRoutes(router: Router, db: Database.Database): void
 
   router.post("/api/correspondences", (req: Request, res: Response) => {
     try {
-      const { id, referenceNumber, branchId, departmentId, direction, status, subject, correspondenceDate, receivedDate, dueDate, createdAt, updatedAt, createBy, updateBy } = req.body;
+      const {
+        id,
+        referenceNumber,
+        reference,
+        senderReference,
+        branchId,
+        departmentId,
+        recipientId,
+        direction,
+        status,
+        subject,
+        correspondenceDate,
+        receivedDate,
+        dueDate,
+        createdAt,
+        updatedAt,
+        createBy,
+        updateBy
+      } = req.body as {
+        id?: string;
+        referenceNumber?: string;
+        reference?: string;
+        senderReference?: string;
+        branchId?: string;
+        departmentId?: string;
+        recipientId?: string;
+        direction?: string;
+        status?: string;
+        subject?: string;
+        correspondenceDate?: string;
+        receivedDate?: string;
+        dueDate?: string;
+        createdAt?: string;
+        updatedAt?: string;
+        createBy?: string | { id?: string };
+        updateBy?: string | { id?: string };
+      };
 
-      if (!id || !referenceNumber || !branchId || !departmentId || !direction || !status || !subject || !receivedDate) {
+      const resolvedReferenceNumber = referenceNumber ?? reference;
+      const resolvedCreateBy = typeof createBy === "object" ? createBy?.id : createBy;
+      const resolvedUpdateBy = typeof updateBy === "object" ? updateBy?.id : updateBy;
+      const hasRoutingTarget = Boolean(departmentId) || Boolean(recipientId);
+
+      if (!id || !resolvedReferenceNumber || !branchId || !direction || !status || !subject || !receivedDate || !hasRoutingTarget) {
         res.status(400).json({ error: "Missing required fields" });
         return;
       }
 
+      const normalizedDepartmentId = departmentId || (recipientId ? "__INDIVIDUAL__" : null);
+
       const stmt = db.prepare(`
         INSERT OR REPLACE INTO correspondences (
-          id, referenceNumber, branchId, departmentId, direction, status, subject,
+          id, referenceNumber, senderReference, branchId, departmentId, recipientId, direction, status, subject,
           correspondenceDate, receivedDate, dueDate, createdAt, updatedAt, createBy, updateBy
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
 
-      stmt.run(id, referenceNumber, branchId, departmentId, direction, status, subject, correspondenceDate || null, receivedDate, dueDate || null, createdAt, updatedAt, createBy, updateBy);
+      stmt.run(
+        id,
+        resolvedReferenceNumber,
+        senderReference || null,
+        branchId,
+        normalizedDepartmentId,
+        recipientId || null,
+        direction,
+        status,
+        subject,
+        correspondenceDate || null,
+        receivedDate,
+        dueDate || null,
+        createdAt,
+        updatedAt,
+        resolvedCreateBy || "SYSTEM",
+        resolvedUpdateBy || resolvedCreateBy || "SYSTEM"
+      );
 
       res.status(200).json({ message: "Correspondence saved successfully" });
     } catch (error) {

@@ -11,6 +11,8 @@ export type CorrespondenceStatus =
 export interface Correspondence {
   id: string;
   reference: string;
+  /** Sender-provided external reference, when available on incoming documents. */
+  senderReference?: string;
   subject: string;
   summary?: string;
   direction: CorrespondenceDirection;

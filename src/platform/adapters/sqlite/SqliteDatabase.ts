@@ -52,6 +52,7 @@ function initSchema(db: Database): void {
     CREATE TABLE IF NOT EXISTS correspondences (
       id              TEXT PRIMARY KEY,
       reference       TEXT NOT NULL,
+      senderReference TEXT,
       subject         TEXT NOT NULL,
       direction       TEXT NOT NULL,
       fromTo          TEXT NOT NULL,
@@ -202,6 +203,10 @@ function ensureCorrespondenceColumns(db: Database): void {
 
   if (!existing.has("summary")) {
     db.exec(`ALTER TABLE correspondences ADD COLUMN summary TEXT`);
+  }
+
+  if (!existing.has("senderReference")) {
+    db.exec(`ALTER TABLE correspondences ADD COLUMN senderReference TEXT`);
   }
 }
 

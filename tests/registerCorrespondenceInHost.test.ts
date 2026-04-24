@@ -205,3 +205,56 @@ test("registerCorrespondenceInHost keeps capture successful when workflow fails"
     workflowConfig.mode = previousMode;
   }
 });
+
+test("registerCorrespondenceInHost uses sender reference as main reference when provided", async () => {
+  const adapter = createInMemoryHostAdapter();
+  const receptionist = getReceptionist();
+
+  const result = await registerCorrespondenceInHost(
+    adapter,
+    receptionist,
+    {
+      subject: "Incoming with external tracking",
+      senderReference: "BCC10/230426",
+      fromTo: "Central Bank",
+      branchId: "b-001",
+      departmentId: "d-002",
+      direction: "INCOMING"
+    },
+    "BANK"
+  );
+
+  assert.equal(result.referenceNumber, "BCC10/230426");
+
+  const saved = await adapter.correspondences.findById(result.correspondenceId);
+  assert.ok(saved);
+  assert.equal(saved.reference, "BCC10/230426");
+  assert.equal(saved.senderReference, "BCC10/230426");
+});
+
+test("registerCorrespondenceInHost generates fallback reference when no active configs", async () => {
+  const adapter = createInMemoryHostAdapter();
+  const receptionist = getReceptionist();
+
+  adapter.referenceConfigs.findActive = async () => [];
+
+  const result = await registerCorrespondenceInHost(
+    adapter,
+    receptionist,
+    {
+      subject: "Incoming without sender reference",
+      fromTo: "Operations Team",
+      branchId: "b-001",
+      departmentId: "d-002",
+      direction: "INCOMING"
+    },
+    "BANK"
+  );
+
+  assert.match(result.referenceNumber, /^BANK\d+\/\d{6}$/);
+
+  const saved = await adapter.correspondences.findById(result.correspondenceId);
+  assert.ok(saved);
+  assert.equal(saved.senderReference, undefined);
+  assert.match(saved.reference, /^BANK\d+\/\d{6}$/);
+});

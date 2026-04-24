@@ -42,6 +42,7 @@ function getDirectionBadgeColor(direction: CorrespondenceDirection): string {
 function resetFormState() {
   return {
     subject: "",
+    senderReference: "",
     fromTo: "",
     organisation: "",
     correspondenceDate: "",
@@ -57,6 +58,7 @@ export function ReceptionistScreen(props: { currentUser: AppUser }): JSX.Element
   const [searchParams] = useSearchParams();
 
   const [subject, setSubject] = useState("");
+  const [senderReference, setSenderReference] = useState("");
   const [fromTo, setFromTo] = useState("");
   const [organisation, setOrganisation] = useState("");
   const [correspondenceDate, setCorrespondenceDate] = useState("");
@@ -107,6 +109,7 @@ export function ReceptionistScreen(props: { currentUser: AppUser }): JSX.Element
   function handleReset(): void {
     const s = resetFormState();
     setSubject(s.subject);
+    setSenderReference(s.senderReference);
     setFromTo(s.fromTo);
     setOrganisation(s.organisation);
     setCorrespondenceDate(s.correspondenceDate);
@@ -145,6 +148,7 @@ export function ReceptionistScreen(props: { currentUser: AppUser }): JSX.Element
           departmentId: effectiveDepartmentId,
           subject: subject.trim(),
           direction,
+          senderReference: senderReference.trim() || undefined,
           fromTo: fromTo.trim(),
           organisation: organisation.trim() || undefined,
           correspondenceDate: correspondenceDate
@@ -178,13 +182,9 @@ export function ReceptionistScreen(props: { currentUser: AppUser }): JSX.Element
             <Title order={2}>
               Register {direction === "INCOMING" ? "Incoming" : "Outgoing"} Correspondence
             </Title>
-            <Badge color={getDirectionBadgeColor(direction)} variant="light" size="lg">
-              Receptionist
-            </Badge>
+            
           </Group>
-          <Text c="dimmed" size="sm">
-            Logged in as <strong>{currentUser.fullName}</strong> ({currentUser.employeeCode})
-          </Text>
+          
         </Box>
 
         <Divider />
@@ -202,7 +202,7 @@ export function ReceptionistScreen(props: { currentUser: AppUser }): JSX.Element
             </Title>
 
             <Select
-              label="Direction"
+              label="Type"
               data={directionOptions}
               value={direction}
               onChange={(value) => setDirection((value as CorrespondenceDirection) ?? "INCOMING")}
@@ -219,6 +219,14 @@ export function ReceptionistScreen(props: { currentUser: AppUser }): JSX.Element
               value={subject}
               onChange={(e) => setSubject(e.currentTarget.value)}
               required
+            />
+
+            <TextInput
+              label="Sender Reference (optional)"
+              placeholder="e.g. BCC10/230426"
+              value={senderReference}
+              onChange={(e) => setSenderReference(e.currentTarget.value)}
+              description="If empty, the system generates a fallback reference automatically."
             />
 
             <TextInput
