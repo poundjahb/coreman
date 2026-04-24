@@ -1,5 +1,10 @@
 import type { Router, Request, Response } from "express";
 import type Database from "better-sqlite3";
+import fs from "fs";
+import path from "path";
+import { randomUUID } from "crypto";
+import { fileURLToPath } from "url";
+import multer from "multer";
 import nodemailer from "nodemailer";
 
 /**
@@ -124,6 +129,94 @@ function getStoredSmtpConfig(db: Database.Database): SmtpConfig | null {
   return rowToSmtpConfig(row);
 }
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const defaultAttachmentRoot = path.join(__dirname, "..", "..", "data", "files");
+const maxAttachmentSizeBytes = 10 * 1024 * 1024;
+const allowedAttachmentMimeTypes = new Set([
+  "application/pdf",
+  "image/png",
+  "image/jpeg",
+  "image/tiff"
+]);
+
+type CorrespondencePayload = {
+  id?: string;
+  referenceNumber?: string;
+  reference?: string;
+  senderReference?: string;
+  branchId?: string;
+  departmentId?: string;
+  recipientId?: string;
+  direction?: string;
+  status?: string;
+  subject?: string;
+  correspondenceDate?: string;
+  receivedDate?: string;
+  dueDate?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  createBy?: string | { id?: string };
+  updateBy?: string | { id?: string };
+};
+
+const uploadAttachment = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: maxAttachmentSizeBytes
+  },
+  fileFilter: (_req, file, cb) => {
+    if (!allowedAttachmentMimeTypes.has(file.mimetype)) {
+      cb(new Error("Unsupported attachment type. Allowed: PDF, PNG, JPEG, TIFF."));
+      return;
+    }
+
+    cb(null, true);
+  }
+}).single("attachment");
+
+function parseMultipartRequest(req: Request, res: Response): Promise<void> {
+  return new Promise((resolve, reject) => {
+    uploadAttachment(req, res, (error: unknown) => {
+      if (error) {
+        reject(error);
+        return;
+      }
+
+      resolve();
+    });
+  });
+}
+
+function getAttachmentRootDir(): string {
+  const fromEnv = process.env.COREMAN_ATTACHMENT_ROOT;
+  return fromEnv && fromEnv.trim().length > 0 ? fromEnv : defaultAttachmentRoot;
+}
+
+function resolveAttachmentExtension(file: Express.Multer.File): string {
+  const ext = path.extname(file.originalname).toLowerCase();
+  if (ext) {
+    return ext;
+  }
+
+  if (file.mimetype === "application/pdf") {
+    return ".pdf";
+  }
+
+  if (file.mimetype === "image/png") {
+    return ".png";
+  }
+
+  if (file.mimetype === "image/jpeg") {
+    return ".jpg";
+  }
+
+  if (file.mimetype === "image/tiff") {
+    return ".tiff";
+  }
+
+  return ".bin";
+}
+
 /**
  * Backend-specific test implementations
  */
@@ -231,8 +324,8 @@ async function testGraphMailBackend(config: EmailConfig, to: string, subject: st
     });
 
     if (!response.ok) {
-      const error = await response.json();
-      res.status(500).json({ error: `Graph Mail API error: ${error.error?.message || response.statusText}` });
+      const errorPayload = await response.json() as { error?: { message?: string } };
+      res.status(500).json({ error: `Graph Mail API error: ${errorPayload.error?.message || response.statusText}` });
       return;
     }
 
@@ -267,8 +360,8 @@ async function testResendBackend(config: EmailConfig, to: string, subject: strin
     });
 
     if (!response.ok) {
-      const error = await response.json();
-      res.status(500).json({ error: `Resend API error: ${error.message || response.statusText}` });
+      const errorPayload = await response.json() as { message?: string };
+      res.status(500).json({ error: `Resend API error: ${errorPayload.message || response.statusText}` });
       return;
     }
 
@@ -307,13 +400,15 @@ export function registerOtherRoutes(router: Router, db: Database.Database): void
     try {
       const { branchId } = req.query;
 
-      let query = "SELECT * FROM correspondences ORDER BY receivedDate DESC";
+      let query = "SELECT * FROM correspondences";
       const params: string[] = [];
 
       if (branchId && typeof branchId === "string") {
         query += " WHERE branchId = ?";
         params.push(branchId);
       }
+
+      query += " ORDER BY receivedDate DESC";
 
       const correspondences = db.prepare(query).all(...params);
       res.json(correspondences);
@@ -340,8 +435,101 @@ export function registerOtherRoutes(router: Router, db: Database.Database): void
     }
   });
 
-  router.post("/api/correspondences", (req: Request, res: Response) => {
+  router.get("/api/correspondences/:id/attachments/download", (req: Request, res: Response) => {
     try {
+      const { id } = req.params;
+      const record = db
+        .prepare("SELECT attachmentFileName, attachmentRelativePath FROM correspondences WHERE id = ?")
+        .get(id) as { attachmentFileName: string | null; attachmentRelativePath: string | null } | undefined;
+
+      if (!record) {
+        res.status(404).json({ error: "Correspondence not found" });
+        return;
+      }
+
+      if (!record.attachmentFileName || !record.attachmentRelativePath) {
+        res.status(404).json({ error: "No attachment found for this correspondence" });
+        return;
+      }
+
+      const rootDir = path.resolve(getAttachmentRootDir());
+      const absolutePath = path.resolve(rootDir, record.attachmentRelativePath);
+      const insideRoot = absolutePath === rootDir || absolutePath.startsWith(`${rootDir}${path.sep}`);
+      if (!insideRoot) {
+        res.status(403).json({ error: "Attachment path is invalid" });
+        return;
+      }
+
+      if (!fs.existsSync(absolutePath)) {
+        res.status(404).json({ error: "Attachment file was not found in storage" });
+        return;
+      }
+
+      res.download(absolutePath, record.attachmentFileName);
+    } catch (error) {
+      console.error("Error downloading correspondence attachment:", error);
+      res.status(500).json({ error: "Failed to download attachment" });
+    }
+  });
+
+  router.get("/api/correspondences/:id/attachments/preview", (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const record = db
+        .prepare("SELECT attachmentFileName, attachmentRelativePath, attachmentMimeType FROM correspondences WHERE id = ?")
+        .get(id) as { attachmentFileName: string | null; attachmentRelativePath: string | null; attachmentMimeType: string | null } | undefined;
+
+      if (!record) {
+        res.status(404).json({ error: "Correspondence not found" });
+        return;
+      }
+
+      if (!record.attachmentFileName || !record.attachmentRelativePath) {
+        res.status(404).json({ error: "No attachment found for this correspondence" });
+        return;
+      }
+
+      const rootDir = path.resolve(getAttachmentRootDir());
+      const absolutePath = path.resolve(rootDir, record.attachmentRelativePath);
+      const insideRoot = absolutePath === rootDir || absolutePath.startsWith(`${rootDir}${path.sep}`);
+      if (!insideRoot) {
+        res.status(403).json({ error: "Attachment path is invalid" });
+        return;
+      }
+
+      if (!fs.existsSync(absolutePath)) {
+        res.status(404).json({ error: "Attachment file was not found in storage" });
+        return;
+      }
+
+      const mimeType = record.attachmentMimeType ?? "application/octet-stream";
+      res.setHeader("Content-Type", mimeType);
+      res.setHeader("Content-Disposition", `inline; filename="${record.attachmentFileName}"`);
+      res.sendFile(absolutePath);
+    } catch (error) {
+      console.error("Error previewing correspondence attachment:", error);
+      res.status(500).json({ error: "Failed to preview attachment" });
+    }
+  });
+
+  router.post("/api/correspondences", async (req: Request, res: Response) => {
+    try {
+      let payload = req.body as CorrespondencePayload;
+      let attachmentFile: Express.Multer.File | undefined;
+
+      if (req.is("multipart/form-data")) {
+        await parseMultipartRequest(req, res);
+        const rawPayload = req.body.payload;
+
+        if (typeof rawPayload !== "string") {
+          res.status(400).json({ error: "Missing multipart payload field." });
+          return;
+        }
+
+        payload = JSON.parse(rawPayload) as CorrespondencePayload;
+        attachmentFile = req.file;
+      }
+
       const {
         id,
         referenceNumber,
@@ -360,25 +548,7 @@ export function registerOtherRoutes(router: Router, db: Database.Database): void
         updatedAt,
         createBy,
         updateBy
-      } = req.body as {
-        id?: string;
-        referenceNumber?: string;
-        reference?: string;
-        senderReference?: string;
-        branchId?: string;
-        departmentId?: string;
-        recipientId?: string;
-        direction?: string;
-        status?: string;
-        subject?: string;
-        correspondenceDate?: string;
-        receivedDate?: string;
-        dueDate?: string;
-        createdAt?: string;
-        updatedAt?: string;
-        createBy?: string | { id?: string };
-        updateBy?: string | { id?: string };
-      };
+      } = payload;
 
       const resolvedReferenceNumber = referenceNumber ?? reference;
       const resolvedCreateBy = typeof createBy === "object" ? createBy?.id : createBy;
@@ -390,13 +560,44 @@ export function registerOtherRoutes(router: Router, db: Database.Database): void
         return;
       }
 
+      let attachmentFileName: string | null = null;
+      let attachmentRelativePath: string | null = null;
+      let attachmentMimeType: string | null = null;
+      let attachmentSizeBytes: number | null = null;
+      let attachmentUploadedAt: string | null = null;
+
+      if (attachmentFile) {
+        const timestamp = createdAt ?? new Date().toISOString();
+        const date = new Date(timestamp);
+        const year = String(date.getUTCFullYear());
+        const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+        const extension = resolveAttachmentExtension(attachmentFile);
+        const finalFileName = `${id}${extension}`;
+        const rootDir = getAttachmentRootDir();
+        const targetDir = path.join(rootDir, year, month, id);
+        const tempPath = path.join(targetDir, `${id}.${randomUUID()}.tmp`);
+        const finalPath = path.join(targetDir, finalFileName);
+
+        fs.mkdirSync(targetDir, { recursive: true });
+        fs.writeFileSync(tempPath, attachmentFile.buffer);
+        fs.renameSync(tempPath, finalPath);
+
+        attachmentFileName = finalFileName;
+        attachmentRelativePath = path.relative(rootDir, finalPath).split(path.sep).join("/");
+        attachmentMimeType = attachmentFile.mimetype;
+        attachmentSizeBytes = attachmentFile.size;
+        attachmentUploadedAt = new Date().toISOString();
+      }
+
       const normalizedDepartmentId = departmentId || (recipientId ? "__INDIVIDUAL__" : null);
 
       const stmt = db.prepare(`
         INSERT OR REPLACE INTO correspondences (
           id, referenceNumber, senderReference, branchId, departmentId, recipientId, direction, status, subject,
-          correspondenceDate, receivedDate, dueDate, createdAt, updatedAt, createBy, updateBy
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          correspondenceDate, receivedDate, dueDate, createdAt, updatedAt,
+          attachmentFileName, attachmentRelativePath, attachmentMimeType, attachmentSizeBytes, attachmentUploadedAt,
+          createBy, updateBy
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
 
       stmt.run(
@@ -414,14 +615,25 @@ export function registerOtherRoutes(router: Router, db: Database.Database): void
         dueDate || null,
         createdAt,
         updatedAt,
+        attachmentFileName,
+        attachmentRelativePath,
+        attachmentMimeType,
+        attachmentSizeBytes,
+        attachmentUploadedAt,
         resolvedCreateBy || "SYSTEM",
         resolvedUpdateBy || resolvedCreateBy || "SYSTEM"
       );
 
       res.status(200).json({ message: "Correspondence saved successfully" });
     } catch (error) {
+      if (error instanceof multer.MulterError && error.code === "LIMIT_FILE_SIZE") {
+        res.status(400).json({ error: "Attachment exceeds 10 MB limit." });
+        return;
+      }
+
       console.error("Error saving correspondence:", error);
-      res.status(500).json({ error: "Failed to save correspondence" });
+      const message = error instanceof Error ? error.message : "Failed to save correspondence";
+      res.status(500).json({ error: message });
     }
   });
 
@@ -528,7 +740,7 @@ export function registerOtherRoutes(router: Router, db: Database.Database): void
       // Validate backend-specific config
       if (backendType === "SMTP") {
         const { smtpHost, smtpPort, smtpSecure } = backendConfig as EmailConfig;
-        if (!smtpHost || !Number.isFinite(smtpPort) || smtpPort <= 0 || typeof smtpSecure !== "boolean") {
+        if (!smtpHost || !Number.isFinite(smtpPort ?? NaN) || (smtpPort ?? 0) <= 0 || typeof smtpSecure !== "boolean") {
           res.status(400).json({ error: "SMTP backend requires: smtpHost, smtpPort (positive number), and smtpSecure (boolean)" });
           return;
         }

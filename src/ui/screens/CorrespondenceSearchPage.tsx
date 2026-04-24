@@ -1,7 +1,21 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Anchor, Badge, Card, Container, Group, Select, Stack, Table, Text, TextInput, Title } from "@mantine/core";
-import { correspondences } from "../mocks/uiData";
-import { CorrespondenceDetailsDrawer } from "../components/CorrespondenceDetailsDrawer";
+import type { Correspondence } from "../../domain/correspondence";
+import type { AppUser, Branch, Department } from "../../domain/governance";
+import { runtimeHostAdapter } from "../../platform/runtimeHostAdapter";
+import { CorrespondenceDetailsDrawerContainer } from "../components/CorrespondenceDetailsDrawerContainer";
+
+function toDateOnly(value: Date | undefined): string {
+  if (!value) {
+    return "";
+  }
+
+  return value.toISOString().slice(0, 10);
+}
+
+function formatDirection(direction: Correspondence["direction"]): string {
+  return direction === "INCOMING" ? "Incoming" : "Outgoing";
+}
 
 export function CorrespondenceSearchPage(): JSX.Element {
   const [reference, setReference] = useState("");
@@ -9,14 +23,74 @@ export function CorrespondenceSearchPage(): JSX.Element {
   const [branch, setBranch] = useState<string | null>("all");
   const [status, setStatus] = useState<string | null>("all");
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [records, setRecords] = useState<Correspondence[]>([]);
+  const [branches, setBranches] = useState<Branch[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [users, setUsers] = useState<AppUser[]>([]);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadData(): Promise<void> {
+      try {
+        setError(null);
+        const [loadedRecords, loadedBranches, loadedDepartments, loadedUsers] = await Promise.all([
+          runtimeHostAdapter.correspondences.findAll(),
+          runtimeHostAdapter.branches.findAll(),
+          runtimeHostAdapter.departments.findAll(),
+          runtimeHostAdapter.users.findAll()
+        ]);
+
+        if (!active) {
+          return;
+        }
+
+        setRecords(loadedRecords);
+        setBranches(loadedBranches);
+        setDepartments(loadedDepartments);
+        setUsers(loadedUsers);
+      } catch (loadError) {
+        if (!active) {
+          return;
+        }
+
+        setError(loadError instanceof Error ? loadError.message : "Unable to load correspondence records.");
+      }
+    }
+
+    void loadData();
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const rows = useMemo(() => {
-    return correspondences
-      .filter((item) => (branch === "all" ? true : item.branch === branch))
+    const branchById = new Map(branches.map((item) => [item.id, item]));
+    const departmentById = new Map(departments.map((item) => [item.id, item]));
+    const userById = new Map(users.map((item) => [item.id, item]));
+
+    return records
+      .filter((item) => (branch === "all" ? true : item.branchId === branch))
       .filter((item) => (status === "all" ? true : item.status === status))
       .filter((item) => item.reference.toLowerCase().includes(reference.trim().toLowerCase()))
-      .filter((item) => item.subject.toLowerCase().includes(subject.trim().toLowerCase()));
-  }, [reference, subject, branch, status]);
+      .filter((item) => item.subject.toLowerCase().includes(subject.trim().toLowerCase()))
+      .map((item) => ({
+        ...item,
+        branchName: branchById.get(item.branchId)?.code ?? item.branchId,
+        departmentName: item.departmentId
+          ? departmentById.get(item.departmentId)?.code ?? item.departmentId
+          : "Unassigned",
+        receptionistName: userById.get(item.registeredById)?.fullName ?? item.registeredById,
+        recipientName: item.recipientId
+          ? userById.get(item.recipientId)?.fullName ?? item.recipientId
+          : "Unassigned",
+        actionOwnerName: item.actionOwnerId
+          ? userById.get(item.actionOwnerId)?.fullName ?? item.actionOwnerId
+          : "Unassigned"
+      }));
+  }, [branch, branches, departments, records, reference, status, subject, users]);
 
   const selectedCorrespondence = useMemo(
     () => rows.find((item) => item.id === selectedId) ?? null,
@@ -30,6 +104,8 @@ export function CorrespondenceSearchPage(): JSX.Element {
           <Title order={2}>Correspondence Search</Title>
           <Text c="dimmed" size="sm">Search correspondence across the organization with multi-criteria filters.</Text>
         </div>
+
+        {error && <Text c="red" size="sm">{error}</Text>}
 
         <Card withBorder radius="md" p="md">
           <Group grow>
@@ -49,11 +125,7 @@ export function CorrespondenceSearchPage(): JSX.Element {
               label="Branch"
               value={branch}
               onChange={setBranch}
-              data={[
-                { value: "all", label: "All" },
-                { value: "HQ", label: "HQ" },
-                { value: "BRN-02", label: "BRN-02" }
-              ]}
+              data={[{ value: "all", label: "All" }, ...branches.map((item) => ({ value: item.id, label: item.code }))]}
             />
             <Select
               label="Status"
@@ -61,10 +133,10 @@ export function CorrespondenceSearchPage(): JSX.Element {
               onChange={setStatus}
               data={[
                 { value: "all", label: "All" },
-                { value: "New", label: "New" },
-                { value: "In Progress", label: "In Progress" },
-                { value: "Awaiting Review", label: "Awaiting Review" },
-                { value: "Closed", label: "Closed" }
+                { value: "NEW", label: "New" },
+                { value: "IN_PROGRESS", label: "In Progress" },
+                { value: "AWAITING_REVIEW", label: "Awaiting Review" },
+                { value: "CLOSED", label: "Closed" }
               ]}
             />
           </Group>
@@ -92,10 +164,10 @@ export function CorrespondenceSearchPage(): JSX.Element {
                       </Anchor>
                     </Table.Td>
                     <Table.Td>{row.subject}</Table.Td>
-                    <Table.Td>{row.branch}</Table.Td>
-                    <Table.Td>{row.department}</Table.Td>
+                    <Table.Td>{row.branchName}</Table.Td>
+                    <Table.Td>{row.departmentName}</Table.Td>
                     <Table.Td><Badge variant="light">{row.status}</Badge></Table.Td>
-                    <Table.Td>{row.dueDate}</Table.Td>
+                    <Table.Td>{toDateOnly(row.dueDate)}</Table.Td>
                   </Table.Tr>
                 ))}
               </Table.Tbody>
@@ -104,22 +176,10 @@ export function CorrespondenceSearchPage(): JSX.Element {
           {rows.length === 0 && <Text c="dimmed" size="sm">No correspondence found.</Text>}
         </Card>
 
-        <CorrespondenceDetailsDrawer
+        <CorrespondenceDetailsDrawerContainer
           opened={Boolean(selectedCorrespondence)}
           onClose={() => setSelectedId(null)}
-          reference={selectedCorrespondence?.reference ?? ""}
-          subject={selectedCorrespondence?.subject ?? ""}
-          direction={selectedCorrespondence?.direction}
-          status={selectedCorrespondence?.status}
-          fields={[
-            { label: "Received Date", value: selectedCorrespondence?.receivedDate ?? "" },
-            { label: "Due Date", value: selectedCorrespondence?.dueDate ?? "" },
-            { label: "Branch", value: selectedCorrespondence?.branch ?? "" },
-            { label: "Department", value: selectedCorrespondence?.department ?? "" },
-            { label: "Receptionist", value: selectedCorrespondence?.receptionist ?? "" },
-            { label: "Recipient", value: selectedCorrespondence?.recipient ?? "" },
-            { label: "Action Owner", value: selectedCorrespondence?.actionOwner ?? "" }
-          ]}
+          correspondence={selectedCorrespondence}
         />
       </Stack>
     </Container>

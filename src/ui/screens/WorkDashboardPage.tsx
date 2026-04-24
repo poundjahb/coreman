@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Anchor,
   Badge,
@@ -7,7 +7,6 @@ import {
   Container,
   Group,
   Menu,
-  Progress,
   SimpleGrid,
   Stack,
   Table,
@@ -16,10 +15,11 @@ import {
 } from "@mantine/core";
 import { Link } from "react-router-dom";
 import { KpiCard } from "../components/KpiCard";
-import { correspondences, tasks } from "../mocks/uiData";
 import type { AppUser } from "../../domain/governance";
+import type { Correspondence } from "../../domain/correspondence";
 import { hasRole } from "../../application/services/accessControl";
-import { CorrespondenceDetailsDrawer } from "../components/CorrespondenceDetailsDrawer";
+import { runtimeHostAdapter } from "../../platform/runtimeHostAdapter";
+import { CorrespondenceDetailsDrawerContainer } from "../components/CorrespondenceDetailsDrawerContainer";
 
 interface WorkDashboardPageProps {
   currentUser: AppUser;
@@ -27,31 +27,91 @@ interface WorkDashboardPageProps {
 
 export function WorkDashboardPage({ currentUser }: WorkDashboardPageProps): JSX.Element {
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const pending = tasks.filter((task) => task.status !== "Completed");
+  const [records, setRecords] = useState<Correspondence[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [usedFallbackScope, setUsedFallbackScope] = useState<boolean>(false);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadRecords(): Promise<void> {
+      try {
+        setError(null);
+        setUsedFallbackScope(false);
+
+        let loaded: Correspondence[];
+        if (hasRole(currentUser, "ADMIN")) {
+          loaded = await runtimeHostAdapter.correspondences.findAll();
+        } else {
+          const byBranch = await runtimeHostAdapter.correspondences.findByBranch(currentUser.branchId);
+          if (byBranch.length > 0) {
+            loaded = byBranch;
+          } else {
+            const all = await runtimeHostAdapter.correspondences.findAll();
+            const assignedToCurrentUser = all.filter(
+              (item) =>
+                item.recipientId === currentUser.id
+                || item.actionOwnerId === currentUser.id
+                || item.registeredById === currentUser.id
+            );
+
+            loaded = assignedToCurrentUser.length > 0 ? assignedToCurrentUser : all;
+            setUsedFallbackScope(true);
+          }
+        }
+
+        if (!active) {
+          return;
+        }
+
+        setRecords(loaded);
+      } catch (loadError) {
+        if (!active) {
+          return;
+        }
+
+        setError(loadError instanceof Error ? loadError.message : "Unable to load correspondence records.");
+      }
+    }
+
+    void loadRecords();
+
+    return () => {
+      active = false;
+    };
+  }, [currentUser]);
 
   const stats = useMemo(() => {
-    const completed = tasks.filter((task) => task.status === "Completed").length;
-    const completion = tasks.length === 0 ? 0 : Math.round((completed / tasks.length) * 100);
-    const overdue = tasks.filter((task) => task.dueDate < "2026-04-20" && task.status !== "Completed").length;
-    const escalated = tasks.filter((task) => task.status === "Blocked").length;
+    const completed = records.filter((item) => item.status === "CLOSED").length;
+    const completion = records.length === 0 ? 0 : Math.round((completed / records.length) * 100);
+    const nowIsoDate = new Date().toISOString().slice(0, 10);
+    const overdue = records.filter((item) => {
+      if (!item.dueDate || item.status === "CLOSED") {
+        return false;
+      }
+
+      return item.dueDate.toISOString().slice(0, 10) < nowIsoDate;
+    }).length;
+    const escalated = 0;
+    const pending = records.filter((item) => item.status !== "CLOSED").length;
 
     return {
       completion,
       overdue,
       escalated,
-      pending: pending.length
+      pending
     };
-  }, [pending.length]);
+  }, [records]);
 
   const isRecipient = hasRole(currentUser, "RECIPIENT") || hasRole(currentUser, "ADMIN");
   const isActionOwner = hasRole(currentUser, "ACTION_OWNER") || hasRole(currentUser, "ADMIN");
-  const selectedCorrespondence = correspondences.find((item) => item.id === selectedId) ?? null;
+  const selectedCorrespondence = records.find((item) => item.id === selectedId) ?? null;
 
   return (
     <Container size="xl" py="lg">
       <Stack gap="lg">
         <div>
-          <Title order={2}>Recipient and Action Owner Dashboard</Title>
+          <Title order={2}>My correspondences Dashboard</Title>
           <Text c="dimmed" size="sm">Monitor received correspondences, pending actions, and delivery performance.</Text>
         </div>
 
@@ -65,8 +125,14 @@ export function WorkDashboardPage({ currentUser }: WorkDashboardPageProps): JSX.
         <Card withBorder radius="md" p="md">
           <Group justify="space-between" mb="sm">
             <Title order={4}>Received Correspondences</Title>
-            <Badge variant="light">{correspondences.length} items</Badge>
+            <Badge variant="light">{records.length} items</Badge>
           </Group>
+          {error && <Text c="red" size="sm" mb="sm">{error}</Text>}
+          {!error && usedFallbackScope && (
+            <Text c="dimmed" size="xs" mb="sm">
+              Branch-specific records were empty; showing available correspondences for visibility.
+            </Text>
+          )}
           <Table.ScrollContainer minWidth={980}>
             <Table striped highlightOnHover verticalSpacing="sm">
               <Table.Thead>
@@ -79,7 +145,7 @@ export function WorkDashboardPage({ currentUser }: WorkDashboardPageProps): JSX.
                 </Table.Tr>
               </Table.Thead>
               <Table.Tbody>
-                {correspondences.map((row) => (
+                {records.map((row) => (
                   <Table.Tr key={row.id}>
                     <Table.Td>
                       <Anchor component="button" type="button" onClick={() => setSelectedId(row.id)}>
@@ -88,7 +154,7 @@ export function WorkDashboardPage({ currentUser }: WorkDashboardPageProps): JSX.
                     </Table.Td>
                     <Table.Td>{row.subject}</Table.Td>
                     <Table.Td>{row.status}</Table.Td>
-                    <Table.Td>{row.actionOwner}</Table.Td>
+                    <Table.Td>{row.actionOwnerId ?? "Unassigned"}</Table.Td>
                     <Table.Td>
                       <Menu shadow="md" width={220}>
                         <Menu.Target>
@@ -116,57 +182,20 @@ export function WorkDashboardPage({ currentUser }: WorkDashboardPageProps): JSX.
           </Table.ScrollContainer>
         </Card>
 
-        <CorrespondenceDetailsDrawer
+        <CorrespondenceDetailsDrawerContainer
           opened={Boolean(selectedCorrespondence)}
           onClose={() => setSelectedId(null)}
-          reference={selectedCorrespondence?.reference ?? ""}
-          subject={selectedCorrespondence?.subject ?? ""}
-          direction={selectedCorrespondence?.direction}
-          status={selectedCorrespondence?.status}
-          fields={[
-            { label: "Received Date", value: selectedCorrespondence?.receivedDate ?? "" },
-            { label: "Due Date", value: selectedCorrespondence?.dueDate ?? "" },
-            { label: "Branch", value: selectedCorrespondence?.branch ?? "" },
-            { label: "Department", value: selectedCorrespondence?.department ?? "" },
-            { label: "Receptionist", value: selectedCorrespondence?.receptionist ?? "" },
-            { label: "Recipient", value: selectedCorrespondence?.recipient ?? "" },
-            { label: "Action Owner", value: selectedCorrespondence?.actionOwner ?? "" }
-          ]}
+          correspondence={selectedCorrespondence}
         />
 
         <Card withBorder radius="md" p="md">
           <Group justify="space-between" mb="sm">
             <Title order={4}>Pending Task Queue</Title>
-            <Badge variant="light">{pending.length} pending</Badge>
+            <Badge variant="light">Not yet integrated</Badge>
           </Group>
-          <Table.ScrollContainer minWidth={960}>
-            <Table striped highlightOnHover verticalSpacing="sm">
-              <Table.Thead>
-                <Table.Tr>
-                  <Table.Th>Task</Table.Th>
-                  <Table.Th>Correspondence</Table.Th>
-                  <Table.Th>Owner</Table.Th>
-                  <Table.Th>Status</Table.Th>
-                  <Table.Th>Due Date</Table.Th>
-                  <Table.Th>Progress</Table.Th>
-                </Table.Tr>
-              </Table.Thead>
-              <Table.Tbody>
-                {pending.map((task) => (
-                  <Table.Tr key={task.id}>
-                    <Table.Td>{task.title}</Table.Td>
-                    <Table.Td>{task.correspondenceRef}</Table.Td>
-                    <Table.Td>{task.owner}</Table.Td>
-                    <Table.Td>{task.status}</Table.Td>
-                    <Table.Td>{task.dueDate}</Table.Td>
-                    <Table.Td>
-                      <Progress value={task.completion} size="sm" radius="xl" />
-                    </Table.Td>
-                  </Table.Tr>
-                ))}
-              </Table.Tbody>
-            </Table>
-          </Table.ScrollContainer>
+          <Text c="dimmed" size="sm">
+            Action task queue is still pending backend integration. Correspondence list above is now live from the configured host adapter.
+          </Text>
         </Card>
       </Stack>
     </Container>

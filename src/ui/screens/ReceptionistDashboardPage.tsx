@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from "react";
 import {
   Anchor,
   Alert,
-  Badge,
   Button,
   Card,
   Container,
@@ -17,10 +16,10 @@ import {
 } from "@mantine/core";
 import { useNavigate } from "react-router-dom";
 import type { Correspondence } from "../../domain/correspondence";
-import type { AppUser, Branch, Department } from "../../domain/governance";
+import type { AppUser, Department } from "../../domain/governance";
 import { hasRole } from "../../application/services/accessControl";
 import { runtimeHostAdapter } from "../../platform/runtimeHostAdapter";
-import { CorrespondenceDetailsDrawer } from "../components/CorrespondenceDetailsDrawer";
+import { CorrespondenceDetailsDrawerContainer } from "../components/CorrespondenceDetailsDrawerContainer";
 
 const DIRECTION_OPTIONS = [
   { value: "all", label: "All" },
@@ -30,14 +29,6 @@ const DIRECTION_OPTIONS = [
 
 function formatDirection(direction: Correspondence["direction"]): string {
   return direction === "INCOMING" ? "Incoming" : "Outgoing";
-}
-
-function formatDate(value: Date | undefined): string {
-  if (!value) {
-    return "-";
-  }
-
-  return value.toISOString().slice(0, 10);
 }
 
 export function ReceptionistDashboardPage(props: { currentUser: AppUser }): JSX.Element {
@@ -200,19 +191,10 @@ export function ReceptionistDashboardPage(props: { currentUser: AppUser }): JSX.
           {!loading && rows.length === 0 && <Text c="dimmed" size="sm">No correspondence matched your filters.</Text>}
         </Card>
 
-        <CorrespondenceDetailsDrawer
+        <CorrespondenceDetailsDrawerContainer
           opened={Boolean(selectedCorrespondence)}
           onClose={() => setSelectedId(null)}
-          reference={selectedCorrespondence?.reference ?? ""}
-          subject={selectedCorrespondence?.subject ?? ""}
-          direction={selectedCorrespondence ? formatDirection(selectedCorrespondence.direction) : undefined}
-          fields={[
-            { label: "Sender Reference", value: selectedCorrespondence?.senderReference ?? "-" },
-            { label: "Received Date", value: selectedCorrespondence ? formatDate(selectedCorrespondence.receivedDate) : "" },
-            { label: "Department", value: selectedCorrespondence?.departmentName ?? "" },
-            { label: "Recipient", value: selectedCorrespondence?.recipientName ?? "" },
-            { label: "Action Owner", value: selectedCorrespondence?.actionOwnerId ?? "" }
-          ]}
+          correspondence={selectedCorrespondence}
         />
       </Stack>
     </Container>

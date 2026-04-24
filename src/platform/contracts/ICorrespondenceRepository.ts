@@ -5,5 +5,6 @@ export interface ICorrespondenceRepository {
   findAll(): Promise<Correspondence[]>;
   findByBranch(branchId: string): Promise<Correspondence[]>;
   save(correspondence: Correspondence): Promise<void>;
+  saveWithAttachment?(correspondence: Correspondence, attachment: File): Promise<void>;
   update(id: string, changes: Partial<Omit<Correspondence, "id">>): Promise<void>;
 }

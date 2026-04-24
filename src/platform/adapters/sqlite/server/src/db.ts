@@ -66,6 +66,11 @@ export function initializeDatabase(): Database.Database {
       dueDate TEXT,
       createdAt TEXT NOT NULL,
       updatedAt TEXT NOT NULL,
+      attachmentFileName TEXT,
+      attachmentRelativePath TEXT,
+      attachmentMimeType TEXT,
+      attachmentSizeBytes INTEGER,
+      attachmentUploadedAt TEXT,
       createBy TEXT NOT NULL,
       updateBy TEXT NOT NULL
     );
@@ -141,6 +146,31 @@ export function initializeDatabase(): Database.Database {
   const hasRecipientId = correspondenceColumns.some((column) => column.name === "recipientId");
   if (!hasRecipientId) {
     db.exec("ALTER TABLE correspondences ADD COLUMN recipientId TEXT");
+  }
+
+  const hasAttachmentFileName = correspondenceColumns.some((column) => column.name === "attachmentFileName");
+  if (!hasAttachmentFileName) {
+    db.exec("ALTER TABLE correspondences ADD COLUMN attachmentFileName TEXT");
+  }
+
+  const hasAttachmentRelativePath = correspondenceColumns.some((column) => column.name === "attachmentRelativePath");
+  if (!hasAttachmentRelativePath) {
+    db.exec("ALTER TABLE correspondences ADD COLUMN attachmentRelativePath TEXT");
+  }
+
+  const hasAttachmentMimeType = correspondenceColumns.some((column) => column.name === "attachmentMimeType");
+  if (!hasAttachmentMimeType) {
+    db.exec("ALTER TABLE correspondences ADD COLUMN attachmentMimeType TEXT");
+  }
+
+  const hasAttachmentSizeBytes = correspondenceColumns.some((column) => column.name === "attachmentSizeBytes");
+  if (!hasAttachmentSizeBytes) {
+    db.exec("ALTER TABLE correspondences ADD COLUMN attachmentSizeBytes INTEGER");
+  }
+
+  const hasAttachmentUploadedAt = correspondenceColumns.some((column) => column.name === "attachmentUploadedAt");
+  if (!hasAttachmentUploadedAt) {
+    db.exec("ALTER TABLE correspondences ADD COLUMN attachmentUploadedAt TEXT");
   }
 
   return db;

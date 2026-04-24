@@ -30,6 +30,16 @@ export interface Correspondence {
   status: CorrespondenceStatus;
   receivedDate: Date;
   dueDate?: Date;
+  /** Saved attachment file name for single-file MVP. */
+  attachmentFileName?: string;
+  /** Attachment path relative to storage root. */
+  attachmentRelativePath?: string;
+  /** Attachment MIME type captured at upload time. */
+  attachmentMimeType?: string;
+  /** Attachment size in bytes. */
+  attachmentSizeBytes?: number;
+  /** Timestamp when attachment was persisted. */
+  attachmentUploadedAt?: Date;
   createdAt: Date;
   updatedAt: Date;
   /** User who initially captured the correspondence */

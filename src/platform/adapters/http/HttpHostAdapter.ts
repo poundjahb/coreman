@@ -69,6 +69,7 @@ function hydrateCorrespondence(raw: Correspondence): Correspondence {
     correspondenceDate: raw.correspondenceDate ? new Date(raw.correspondenceDate) : undefined,
     receivedDate: new Date(raw.receivedDate),
     dueDate: raw.dueDate ? new Date(raw.dueDate) : undefined,
+    attachmentUploadedAt: raw.attachmentUploadedAt ? new Date(raw.attachmentUploadedAt) : undefined,
     createdAt: new Date(raw.createdAt),
     updatedAt: new Date(raw.updatedAt),
     createBy: raw.createBy,
@@ -118,6 +119,30 @@ async function requestJson<TResponse>(
   return (await response.json()) as TResponse;
 }
 
+async function requestFormData<TResponse>(
+  baseUrl: string,
+  path: string,
+  method: "POST" | "PUT" | "PATCH",
+  body: FormData,
+  query?: Record<string, string | undefined>
+): Promise<TResponse> {
+  const response = await fetch(`${baseUrl}${path}${serializeQuery(query)}`, {
+    method,
+    body
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Server API request failed (${response.status}): ${errorText}`);
+  }
+
+  if (response.status === 204) {
+    return undefined as TResponse;
+  }
+
+  return (await response.json()) as TResponse;
+}
+
 export function createHttpHostAdapter(options: HttpHostAdapterOptions = {}): IHostAdapter {
   const apiBaseUrl = getApiBaseUrl(options);
 
@@ -138,6 +163,12 @@ export function createHttpHostAdapter(options: HttpHostAdapterOptions = {}): IHo
       },
       async save(correspondence: Correspondence): Promise<void> {
         await requestJson<void>(apiBaseUrl, "/api/correspondences", "POST", correspondence);
+      },
+      async saveWithAttachment(correspondence: Correspondence, attachment: File): Promise<void> {
+        const formData = new FormData();
+        formData.append("payload", JSON.stringify(correspondence));
+        formData.append("attachment", attachment, attachment.name);
+        await requestFormData<void>(apiBaseUrl, "/api/correspondences", "POST", formData);
       },
       async update(id: string, changes: Partial<Omit<Correspondence, "id">>): Promise<void> {
         await requestJson<void>(apiBaseUrl, `/api/correspondences/${id}`, "PATCH", changes);

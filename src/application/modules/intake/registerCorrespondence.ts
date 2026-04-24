@@ -45,6 +45,8 @@ export interface RegisterCorrespondenceCommand {
   actionOwnerId?: AppUser["id"];
   /** Optional scanned/digital content, encoded by caller. */
   digitalContent?: string;
+  /** Optional attachment file uploaded at registration time. */
+  attachmentFile?: File;
 }
 
 const sequenceStore = new InMemorySequenceStore();
@@ -179,7 +181,11 @@ export async function registerCorrespondenceInHost(
     throw new Error("Summary cannot exceed 500 characters.");
   }
 
-  await hostAdapter.correspondences.save(correspondence);
+  if (input.attachmentFile && hostAdapter.correspondences.saveWithAttachment) {
+    await hostAdapter.correspondences.saveWithAttachment(correspondence, input.attachmentFile);
+  } else {
+    await hostAdapter.correspondences.save(correspondence);
+  }
 
   const workflowMode = getRuntimeWorkflowMode();
   try {

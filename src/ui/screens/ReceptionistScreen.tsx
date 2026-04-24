@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import {
   Alert,
-  Badge,
   Box,
   Button,
   Card,
@@ -33,10 +32,6 @@ const directionOptions: Array<{ value: CorrespondenceDirection; label: string }>
 
 function getDirectionFromQuery(rawValue: string | null): CorrespondenceDirection {
   return rawValue === "OUTGOING" ? "OUTGOING" : "INCOMING";
-}
-
-function getDirectionBadgeColor(direction: CorrespondenceDirection): string {
-  return direction === "INCOMING" ? "blue" : "dark";
 }
 
 function resetFormState() {
@@ -154,7 +149,8 @@ export function ReceptionistScreen(props: { currentUser: AppUser }): JSX.Element
           correspondenceDate: correspondenceDate
             ? new Date(`${correspondenceDate}T00:00:00.000Z`)
             : undefined,
-          recipientId: recipientTab === "staff" ? (recipientUserId ?? undefined) : undefined
+          recipientId: recipientTab === "staff" ? (recipientUserId ?? undefined) : undefined,
+          attachmentFile: attachedFiles[0]
         },
         systemConfig.orgCode
       );
