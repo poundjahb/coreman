@@ -7,6 +7,54 @@ import { fileURLToPath } from "url";
 import multer from "multer";
 import nodemailer from "nodemailer";
 
+type CorrespondenceAuditEventType =
+  | "CORRESPONDENCE_CREATED"
+  | "CORRESPONDENCE_UPDATED"
+  | "CORRESPONDENCE_ASSIGNED"
+  | "CORRESPONDENCE_STATUS_CHANGED"
+  | "AGENT_CALL"
+  | "AGENT_RESPONSE"
+  | "NOTIFICATION_SENT"
+  | "NOTIFICATION_SKIPPED"
+  | "NOTIFICATION_FAILED"
+  | "WORKFLOW_FAILURE"
+  | "POWERFLOW_CALL"
+  | "POWERFLOW_RESPONSE";
+
+type CorrespondenceAuditEventStatus = "SUCCESS" | "FAILED" | "SKIPPED";
+
+type WorkflowMode = "BASIC" | "EXTENDED";
+
+type WorkflowCorrespondence = {
+  id: string;
+  reference: string;
+  subject: string;
+  recipientId?: string;
+  actionOwnerId?: string;
+  dueDate?: string | Date | null;
+};
+
+type WorkflowActor = {
+  id: string;
+};
+
+type ExecutePostCaptureWorkflowCommand = {
+  correspondence: WorkflowCorrespondence;
+  actor: WorkflowActor;
+  mode: WorkflowMode;
+  context?: {
+    digitalContent?: string;
+    metadata?: Record<string, unknown>;
+  };
+};
+
+type NotificationPayload = {
+  recipientId: string;
+  subject: string;
+  body: string;
+  correspondenceId?: string;
+};
+
 /**
  * Polymorphic email config structure supporting multiple backends
  */
@@ -375,6 +423,259 @@ async function testResendBackend(config: EmailConfig, to: string, subject: strin
   }
 }
 
+type AuditEventInput = {
+  correspondenceId: string;
+  eventType: CorrespondenceAuditEventType;
+  status: CorrespondenceAuditEventStatus;
+  payloadJson?: string;
+  errorMessage?: string;
+  createdById: string;
+  createdAt?: string;
+};
+
+type NotificationDispatchOutcome = "SENT" | "SKIPPED" | "FAILED";
+
+function resolveActionSource(actorId: string): "USER" | "SYSTEM" {
+  return actorId === "SYSTEM" ? "SYSTEM" : "USER";
+}
+
+function appendAuditEvent(db: Database.Database, input: AuditEventInput): void {
+  const createdAt = input.createdAt ?? new Date().toISOString();
+  db.prepare(
+    `INSERT INTO correspondence_audit_log (
+      id, correspondenceId, eventType, status, payloadJson, errorMessage, details, createdAt, createdById, createdBy
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  ).run(
+    randomUUID(),
+    input.correspondenceId,
+    input.eventType,
+    input.status,
+    input.payloadJson ?? null,
+    input.errorMessage ?? null,
+    input.payloadJson ?? null,
+    createdAt,
+    input.createdById,
+    input.createdById
+  );
+}
+
+function composeBasicMail(reference: string, subject: string): { subject: string; body: string } {
+  return {
+    subject: `Correspondence ${reference} received`,
+    body: [
+      "A new correspondence has been captured and assigned.",
+      `Reference: ${reference}`,
+      `Subject: ${subject}`
+    ].join("\n")
+  };
+}
+
+function composeExtendedMail(reference: string): { subject: string; body: string } {
+  return {
+    subject: `Action required: ${reference}`,
+    body: [
+      "The correspondence has been analyzed by the simulated agent.",
+      `Summary: Automated summary for ${reference}`,
+      "Suggested action: Assign to action owner and acknowledge sender"
+    ].join("\n")
+  };
+}
+
+async function sendEmailUsingConfiguredBackend(config: EmailConfig, to: string, subject: string, body: string): Promise<string | undefined> {
+  if (config.backendType === "SMTP") {
+    const transport = nodemailer.createTransport({
+      host: config.smtpHost,
+      port: config.smtpPort,
+      secure: config.smtpSecure,
+      auth: config.smtpUser && config.smtpPass
+        ? {
+          user: config.smtpUser,
+          pass: config.smtpPass
+        }
+        : undefined,
+      connectionTimeout: config.connectionTimeoutMs,
+      greetingTimeout: config.connectionTimeoutMs,
+      socketTimeout: config.connectionTimeoutMs
+    });
+
+    const result = await transport.sendMail({
+      from: config.fromAddress,
+      to: to.trim(),
+      subject,
+      text: body
+    });
+
+    return result.messageId;
+  }
+
+  if (config.backendType === "GRAPH_MAIL") {
+    if (!config.graphAccessToken) {
+      throw new Error("Graph Mail API access token not available. Please re-authenticate through the UI.");
+    }
+
+    const response = await fetch("https://graph.microsoft.com/v1.0/me/sendMail", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${config.graphAccessToken}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        message: {
+          subject,
+          body: {
+            contentType: "HTML",
+            content: body
+          },
+          toRecipients: [
+            {
+              emailAddress: {
+                address: to.trim()
+              }
+            }
+          ]
+        },
+        saveToSentItems: true
+      })
+    });
+
+    if (!response.ok) {
+      const payload = await response.json() as { error?: { message?: string } };
+      throw new Error(`Graph Mail API error: ${payload.error?.message || response.statusText}`);
+    }
+
+    return undefined;
+  }
+
+  if (config.backendType === "RESEND") {
+    if (!config.resendApiKey) {
+      throw new Error("Resend API key not available. Please configure it in the settings.");
+    }
+
+    const response = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${config.resendApiKey}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        from: config.fromAddress,
+        to: to.trim(),
+        subject,
+        html: body,
+        text: body
+      })
+    });
+
+    if (!response.ok) {
+      const payload = await response.json() as { message?: string };
+      throw new Error(`Resend API error: ${payload.message || response.statusText}`);
+    }
+
+    const payload = await response.json() as { id?: string };
+    return payload.id;
+  }
+
+  throw new Error(`Unsupported email backend type: ${config.backendType}`);
+}
+
+async function dispatchNotification(
+  db: Database.Database,
+  payload: NotificationPayload,
+  createdById: string,
+  mode: "BASIC" | "EXTENDED"
+): Promise<NotificationDispatchOutcome> {
+  db.prepare(
+    `INSERT INTO notifications (id, recipientId, subject, body, correspondenceId, sentAt)
+     VALUES (?, ?, ?, ?, ?, ?)`
+  ).run(
+    randomUUID(),
+    payload.recipientId,
+    payload.subject,
+    payload.body,
+    payload.correspondenceId ?? null,
+    new Date().toISOString()
+  );
+
+  const recipientRow = db.prepare("SELECT email FROM users WHERE id = ?").get(payload.recipientId) as
+    | { email: string | null }
+    | undefined;
+  const recipientEmail = recipientRow?.email?.trim();
+
+  if (!payload.correspondenceId) {
+    return "FAILED";
+  }
+
+  if (!recipientEmail) {
+    appendAuditEvent(db, {
+      correspondenceId: payload.correspondenceId,
+      eventType: "NOTIFICATION_SKIPPED",
+      status: "SKIPPED",
+      payloadJson: JSON.stringify({
+        mode,
+        recipientId: payload.recipientId,
+        reason: "RECIPIENT_EMAIL_MISSING",
+        actionSource: resolveActionSource(createdById)
+      }),
+      createdById
+    });
+    return "SKIPPED";
+  }
+
+  const config = getStoredEmailConfig(db);
+  if (!config) {
+    appendAuditEvent(db, {
+      correspondenceId: payload.correspondenceId,
+      eventType: "NOTIFICATION_FAILED",
+      status: "FAILED",
+      payloadJson: JSON.stringify({
+        mode,
+        recipientId: payload.recipientId,
+        actionSource: resolveActionSource(createdById)
+      }),
+      errorMessage: "Email settings are not configured.",
+      createdById
+    });
+    return "FAILED";
+  }
+
+  try {
+    const messageId = await sendEmailUsingConfiguredBackend(config, recipientEmail, payload.subject, payload.body);
+    appendAuditEvent(db, {
+      correspondenceId: payload.correspondenceId,
+      eventType: "NOTIFICATION_SENT",
+      status: "SUCCESS",
+      payloadJson: JSON.stringify({
+        mode,
+        backendType: config.backendType,
+        recipientId: payload.recipientId,
+        recipientEmail,
+        subject: payload.subject,
+        messageId,
+        actionSource: resolveActionSource(createdById)
+      }),
+      createdById
+    });
+    return "SENT";
+  } catch (error) {
+    appendAuditEvent(db, {
+      correspondenceId: payload.correspondenceId,
+      eventType: "NOTIFICATION_FAILED",
+      status: "FAILED",
+      payloadJson: JSON.stringify({
+        mode,
+        backendType: config.backendType,
+        recipientId: payload.recipientId,
+        recipientEmail,
+        subject: payload.subject,
+        actionSource: resolveActionSource(createdById)
+      }),
+      errorMessage: error instanceof Error ? error.message : "Notification delivery failed",
+      createdById
+    });
+    return "FAILED";
+  }
+}
+
 export function registerOtherRoutes(router: Router, db: Database.Database): void {
   // Reference configs
   router.get("/api/reference-configs", (_req: Request, res: Response) => {
@@ -630,6 +931,21 @@ export function registerOtherRoutes(router: Router, db: Database.Database): void
         resolvedUpdateBy || resolvedCreateBy || "SYSTEM"
       );
 
+      appendAuditEvent(db, {
+        correspondenceId: id,
+        eventType: "CORRESPONDENCE_CREATED",
+        status: "SUCCESS",
+        payloadJson: JSON.stringify({
+          actionName: "CORRESPONDENCE_CREATED",
+          actionSource: resolveActionSource(resolvedCreateBy || "SYSTEM"),
+          referenceNumber: resolvedReferenceNumber,
+          recipientId: recipientId || null,
+          subject,
+          direction
+        }),
+        createdById: resolvedCreateBy || "SYSTEM"
+      });
+
       res.status(200).json({ message: "Correspondence saved successfully" });
     } catch (error) {
       if (error instanceof multer.MulterError && error.code === "LIMIT_FILE_SIZE") {
@@ -647,13 +963,16 @@ export function registerOtherRoutes(router: Router, db: Database.Database): void
     try {
       const { id } = req.params;
       const updates = req.body;
+      const actorIdRaw = req.header("x-user-id") || (typeof updates?.updateBy === "string" ? updates.updateBy : undefined);
+      const actorId = actorIdRaw && actorIdRaw.trim().length > 0 ? actorIdRaw : "SYSTEM";
+      const changedFields = Object.keys(updates ?? {});
 
-      if (Object.keys(updates).length === 0) {
+      if (changedFields.length === 0) {
         res.status(400).json({ error: "No fields to update" });
         return;
       }
 
-      const setClauses = Object.keys(updates)
+      const setClauses = changedFields
         .map((key) => `${key} = ?`)
         .join(", ");
       const values = Object.values(updates);
@@ -664,6 +983,32 @@ export function registerOtherRoutes(router: Router, db: Database.Database): void
       if ((result as any).changes === 0) {
         res.status(404).json({ error: "Correspondence not found" });
         return;
+      }
+
+      appendAuditEvent(db, {
+        correspondenceId: id,
+        eventType: "CORRESPONDENCE_UPDATED",
+        status: "SUCCESS",
+        payloadJson: JSON.stringify({
+          actionName: "CORRESPONDENCE_UPDATED",
+          actionSource: resolveActionSource(actorId),
+          changedFields
+        }),
+        createdById: actorId
+      });
+
+      if (changedFields.includes("status") && typeof updates.status === "string") {
+        appendAuditEvent(db, {
+          correspondenceId: id,
+          eventType: "CORRESPONDENCE_STATUS_CHANGED",
+          status: "SUCCESS",
+          payloadJson: JSON.stringify({
+            actionName: "CORRESPONDENCE_STATUS_CHANGED",
+            actionSource: resolveActionSource(actorId),
+            status: updates.status
+          }),
+          createdById: actorId
+        });
       }
 
       res.status(200).json({ message: "Correspondence updated successfully" });
@@ -684,7 +1029,20 @@ export function registerOtherRoutes(router: Router, db: Database.Database): void
       }
 
       const events = db
-        .prepare("SELECT * FROM correspondence_audit_log WHERE correspondenceId = ? ORDER BY createdAt DESC")
+        .prepare(
+          `SELECT
+             id,
+             correspondenceId,
+             eventType,
+             COALESCE(status, 'SUCCESS') AS status,
+             COALESCE(payloadJson, details) AS payloadJson,
+             errorMessage,
+             createdAt,
+             COALESCE(createdById, createdBy, 'SYSTEM') AS createdById
+           FROM correspondence_audit_log
+           WHERE correspondenceId = ?
+           ORDER BY createdAt DESC`
+        )
         .all(correspondenceId);
 
       res.json(events);
@@ -696,21 +1054,69 @@ export function registerOtherRoutes(router: Router, db: Database.Database): void
 
   router.post("/api/correspondence-audit-log", (req: Request, res: Response) => {
     try {
-      const { id, correspondenceId, eventType, details, createdAt, createdBy } = req.body;
+      const {
+        correspondenceId,
+        eventType,
+        status,
+        payloadJson,
+        errorMessage,
+        createdAt,
+        createdById,
+        details,
+        createdBy
+      } = req.body as {
+        correspondenceId?: string;
+        eventType?: CorrespondenceAuditEventType;
+        status?: CorrespondenceAuditEventStatus;
+        payloadJson?: string;
+        errorMessage?: string;
+        createdAt?: string;
+        createdById?: string;
+        details?: string;
+        createdBy?: string;
+      };
 
-      if (!id || !correspondenceId || !eventType || !createdBy) {
+      const normalizedCreatedById = createdById || createdBy || "SYSTEM";
+
+      if (!correspondenceId || !eventType) {
         res.status(400).json({ error: "Missing required fields" });
         return;
       }
 
-      const stmt = db.prepare(`
-        INSERT INTO correspondence_audit_log (id, correspondenceId, eventType, details, createdAt, createdBy)
-        VALUES (?, ?, ?, ?, ?, ?)
-      `);
+      const id = randomUUID();
+      const normalizedStatus = status ?? "SUCCESS";
+      const normalizedPayloadJson = payloadJson ?? details;
 
-      stmt.run(id, correspondenceId, eventType, details || null, createdAt || new Date().toISOString(), createdBy);
+      db.prepare(
+        `INSERT INTO correspondence_audit_log (
+          id, correspondenceId, eventType, status, payloadJson, errorMessage, details, createdAt, createdById, createdBy
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      ).run(
+        id,
+        correspondenceId,
+        eventType,
+        normalizedStatus,
+        normalizedPayloadJson ?? null,
+        errorMessage ?? null,
+        normalizedPayloadJson ?? null,
+        createdAt || new Date().toISOString(),
+        normalizedCreatedById,
+        normalizedCreatedById
+      );
 
-      const result = db.prepare("SELECT * FROM correspondence_audit_log WHERE id = ?").get(id);
+      const result = db.prepare(
+        `SELECT
+           id,
+           correspondenceId,
+           eventType,
+           COALESCE(status, 'SUCCESS') AS status,
+           COALESCE(payloadJson, details) AS payloadJson,
+           errorMessage,
+           createdAt,
+           COALESCE(createdById, createdBy, 'SYSTEM') AS createdById
+         FROM correspondence_audit_log
+         WHERE id = ?`
+      ).get(id);
       res.status(201).json(result);
     } catch (error) {
       console.error("Error creating audit log entry:", error);
@@ -967,10 +1373,18 @@ export function registerOtherRoutes(router: Router, db: Database.Database): void
   });
 
   // Notifications
-  router.post("/api/notifications", (req: Request, res: Response) => {
+  router.post("/api/notifications", async (req: Request, res: Response) => {
     try {
-      // For now, just acknowledge notifications
-      res.status(200).json({ message: "Notification acknowledged" });
+      const payload = req.body as NotificationPayload;
+      const actorId = req.header("x-user-id") || "SYSTEM";
+
+      if (!payload?.recipientId || !payload?.subject || !payload?.body || !payload?.correspondenceId) {
+        res.status(400).json({ error: "recipientId, subject, body, and correspondenceId are required" });
+        return;
+      }
+
+      const outcome = await dispatchNotification(db, payload, actorId, "BASIC");
+      res.status(200).json({ message: "Notification processed", outcome });
     } catch (error) {
       console.error("Error sending notification:", error);
       res.status(500).json({ error: "Failed to send notification" });
@@ -997,13 +1411,96 @@ export function registerOtherRoutes(router: Router, db: Database.Database): void
   });
 
   // Post-capture workflow
-  router.post("/api/post-capture-workflow/execute", (req: Request, res: Response) => {
+  router.post("/api/post-capture-workflow/execute", async (req: Request, res: Response) => {
     try {
-      // For now, just acknowledge execution
-      res.status(200).json({ message: "Workflow execution acknowledged" });
+      const command = req.body as ExecutePostCaptureWorkflowCommand;
+
+      if (!command?.correspondence?.id || !command?.actor?.id || !command?.mode) {
+        res.status(400).json({ error: "Invalid workflow command payload" });
+        return;
+      }
+
+      const correspondence = command.correspondence;
+      const actor = command.actor;
+      const recipientId = correspondence.recipientId ?? correspondence.actionOwnerId ?? actor.id;
+
+      if (command.mode === "EXTENDED") {
+        appendAuditEvent(db, {
+          correspondenceId: correspondence.id,
+          eventType: "AGENT_CALL",
+          status: "SUCCESS",
+          payloadJson: JSON.stringify({
+            reference: correspondence.reference,
+            metadata: command.context?.metadata ?? {},
+            hasDigitalContent: Boolean(command.context?.digitalContent),
+            actionSource: resolveActionSource(actor.id)
+          }),
+          createdById: actor.id
+        });
+
+        appendAuditEvent(db, {
+          correspondenceId: correspondence.id,
+          eventType: "AGENT_RESPONSE",
+          status: "SUCCESS",
+          payloadJson: JSON.stringify({
+            summary: `Automated summary for ${correspondence.reference}`,
+            suggestedAction: "Assign to action owner and acknowledge sender",
+            ownerId: correspondence.actionOwnerId,
+            deadline: correspondence.dueDate ?? null,
+            confidenceScore: 0.84,
+            actionSource: resolveActionSource(actor.id)
+          }),
+          createdById: actor.id
+        });
+      }
+
+      const mail = command.mode === "BASIC"
+        ? composeBasicMail(correspondence.reference, correspondence.subject)
+        : composeExtendedMail(correspondence.reference);
+
+      const notificationOutcome = await dispatchNotification(
+        db,
+        {
+          recipientId,
+          subject: mail.subject,
+          body: mail.body,
+          correspondenceId: correspondence.id
+        },
+        actor.id,
+        command.mode
+      );
+
+      if (notificationOutcome === "FAILED") {
+        appendAuditEvent(db, {
+          correspondenceId: correspondence.id,
+          eventType: "WORKFLOW_FAILURE",
+          status: "FAILED",
+          payloadJson: JSON.stringify({ mode: command.mode, notificationOutcome }),
+          errorMessage: "Post-capture notification failed",
+          createdById: actor.id
+        });
+      }
+
+      res.status(200).json({ message: "Workflow execution completed", notificationOutcome });
     } catch (error) {
       console.error("Error executing workflow:", error);
-      res.status(500).json({ error: "Failed to execute workflow" });
+
+      const command = req.body as ExecutePostCaptureWorkflowCommand | undefined;
+      if (command?.correspondence?.id) {
+        appendAuditEvent(db, {
+          correspondenceId: command.correspondence.id,
+          eventType: "WORKFLOW_FAILURE",
+          status: "FAILED",
+          payloadJson: JSON.stringify({ mode: command.mode ?? "BASIC" }),
+          errorMessage: error instanceof Error ? error.message : "Failed to execute workflow",
+          createdById: command.actor?.id || "SYSTEM"
+        });
+      }
+
+      res.status(200).json({
+        message: "Workflow execution completed with failure",
+        error: error instanceof Error ? error.message : "Failed to execute workflow"
+      });
     }
   });
 }

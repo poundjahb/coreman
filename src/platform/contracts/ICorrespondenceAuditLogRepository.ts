@@ -1,12 +1,18 @@
 export type CorrespondenceAuditEventType =
+  | "CORRESPONDENCE_CREATED"
+  | "CORRESPONDENCE_UPDATED"
+  | "CORRESPONDENCE_ASSIGNED"
+  | "CORRESPONDENCE_STATUS_CHANGED"
   | "AGENT_CALL"
   | "AGENT_RESPONSE"
   | "NOTIFICATION_SENT"
+  | "NOTIFICATION_SKIPPED"
+  | "NOTIFICATION_FAILED"
   | "WORKFLOW_FAILURE"
   | "POWERFLOW_CALL"
   | "POWERFLOW_RESPONSE";
 
-export type CorrespondenceAuditEventStatus = "SUCCESS" | "FAILED";
+export type CorrespondenceAuditEventStatus = "SUCCESS" | "FAILED" | "SKIPPED";
 
 export interface CorrespondenceAuditEvent {
   id: string;

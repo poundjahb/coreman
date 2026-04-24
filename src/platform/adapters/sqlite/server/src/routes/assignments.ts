@@ -1,5 +1,6 @@
 import type { Router, Request, Response } from "express";
 import type Database from "better-sqlite3";
+import { randomUUID } from "crypto";
 
 const ALLOWED_STATUSES = new Set(["ASSIGNED", "IN_PROGRESS", "COMPLETED", "CANCELED"]);
 
@@ -40,6 +41,37 @@ function ensureActionDefinitionExists(db: Database.Database, actionDefinitionId:
 function ensureUserExists(db: Database.Database, userId: string): boolean {
   const record = db.prepare("SELECT id FROM users WHERE id = ? AND isActive = 1").get(userId) as { id: string } | undefined;
   return Boolean(record);
+}
+
+function resolveActionSource(actorId: string): "USER" | "SYSTEM" {
+  return actorId === "SYSTEM" ? "SYSTEM" : "USER";
+}
+
+function appendAuditEvent(
+  db: Database.Database,
+  correspondenceId: string,
+  eventType: string,
+  actorId: string,
+  payload: Record<string, unknown>
+): void {
+  const now = new Date().toISOString();
+  const payloadJson = JSON.stringify(payload);
+  db.prepare(
+    `INSERT INTO correspondence_audit_log (
+      id, correspondenceId, eventType, status, payloadJson, errorMessage, details, createdAt, createdById, createdBy
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  ).run(
+    randomUUID(),
+    correspondenceId,
+    eventType,
+    "SUCCESS",
+    payloadJson,
+    null,
+    payloadJson,
+    now,
+    actorId,
+    actorId
+  );
 }
 
 export function registerAssignmentsRoutes(router: Router, db: Database.Database): void {
@@ -144,6 +176,15 @@ export function registerAssignmentsRoutes(router: Router, db: Database.Database)
         createdBy,
         updatedBy
       );
+
+      appendAuditEvent(db, correspondenceId, "CORRESPONDENCE_ASSIGNED", createdBy, {
+        actionName: "CORRESPONDENCE_ASSIGNED",
+        actionSource: resolveActionSource(createdBy),
+        assignmentId: id,
+        actionDefinitionId,
+        assigneeUserId,
+        status
+      });
 
       res.status(200).json({ message: "Assignment saved successfully" });
     } catch (error) {
@@ -286,6 +327,32 @@ export function registerAssignmentsRoutes(router: Router, db: Database.Database)
       if (result.changes === 0) {
         res.status(404).json({ error: "Assignment not found" });
         return;
+      }
+
+      const assignment = db
+        .prepare("SELECT correspondenceId FROM correspondence_task_assignments WHERE id = ?")
+        .get(id) as { correspondenceId: string } | undefined;
+
+      if (assignment) {
+        const actorId = typeof updates.updatedBy === "string" && updates.updatedBy.length > 0
+          ? updates.updatedBy
+          : "SYSTEM";
+
+        appendAuditEvent(db, assignment.correspondenceId, "CORRESPONDENCE_UPDATED", actorId, {
+          actionName: "ASSIGNMENT_UPDATED",
+          actionSource: resolveActionSource(actorId),
+          assignmentId: id,
+          changedFields: setClauses.map((clause) => clause.split("=")[0]?.trim()).filter(Boolean)
+        });
+
+        if (typeof updates.status === "string") {
+          appendAuditEvent(db, assignment.correspondenceId, "CORRESPONDENCE_STATUS_CHANGED", actorId, {
+            actionName: "ASSIGNMENT_STATUS_CHANGED",
+            actionSource: resolveActionSource(actorId),
+            assignmentId: id,
+            status: updates.status
+          });
+        }
       }
 
       res.status(200).json({ message: "Assignment updated successfully" });

@@ -128,9 +128,22 @@ export function initializeDatabase(): Database.Database {
       id TEXT PRIMARY KEY,
       correspondenceId TEXT NOT NULL,
       eventType TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'SUCCESS',
+      payloadJson TEXT,
+      errorMessage TEXT,
       details TEXT,
       createdAt TEXT NOT NULL,
+      createdById TEXT,
       createdBy TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS notifications (
+      id TEXT PRIMARY KEY,
+      recipientId TEXT NOT NULL,
+      subject TEXT NOT NULL,
+      body TEXT NOT NULL,
+      correspondenceId TEXT,
+      sentAt TEXT NOT NULL
     );
 
     CREATE TABLE IF NOT EXISTS email_settings (
@@ -205,6 +218,30 @@ export function initializeDatabase(): Database.Database {
   if (!hasAssignmentDescription) {
     db.exec("ALTER TABLE correspondence_task_assignments ADD COLUMN description TEXT");
   }
+
+  const auditColumns = db.prepare("PRAGMA table_info(correspondence_audit_log)").all() as Array<{ name: string }>;
+  const hasAuditStatus = auditColumns.some((column) => column.name === "status");
+  if (!hasAuditStatus) {
+    db.exec("ALTER TABLE correspondence_audit_log ADD COLUMN status TEXT NOT NULL DEFAULT 'SUCCESS'");
+  }
+
+  const hasAuditPayload = auditColumns.some((column) => column.name === "payloadJson");
+  if (!hasAuditPayload) {
+    db.exec("ALTER TABLE correspondence_audit_log ADD COLUMN payloadJson TEXT");
+  }
+
+  const hasAuditError = auditColumns.some((column) => column.name === "errorMessage");
+  if (!hasAuditError) {
+    db.exec("ALTER TABLE correspondence_audit_log ADD COLUMN errorMessage TEXT");
+  }
+
+  const hasAuditCreatedById = auditColumns.some((column) => column.name === "createdById");
+  if (!hasAuditCreatedById) {
+    db.exec("ALTER TABLE correspondence_audit_log ADD COLUMN createdById TEXT");
+  }
+
+  db.exec("UPDATE correspondence_audit_log SET createdById = createdBy WHERE createdById IS NULL");
+  db.exec("UPDATE correspondence_audit_log SET payloadJson = details WHERE payloadJson IS NULL AND details IS NOT NULL");
 
   return db;
 }
