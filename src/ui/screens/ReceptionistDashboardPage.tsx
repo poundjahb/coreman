@@ -27,8 +27,15 @@ const DIRECTION_OPTIONS = [
   { value: "OUTGOING", label: "Outgoing" }
 ];
 
-function formatDirection(direction: Correspondence["direction"]): string {
-  return direction === "INCOMING" ? "Incoming" : "Outgoing";
+function toDateOnly(value: Date | undefined): string {
+  if (!value) {
+    return "";
+  }
+
+  const year = value.getFullYear();
+  const month = String(value.getMonth() + 1).padStart(2, "0");
+  const day = String(value.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
 export function ReceptionistDashboardPage(props: { currentUser: AppUser }): JSX.Element {
@@ -91,24 +98,33 @@ export function ReceptionistDashboardPage(props: { currentUser: AppUser }): JSX.
   const rows = useMemo(() => {
     const departmentById = new Map(departments.map((item) => [item.id, item]));
     const userById = new Map(users.map((item) => [item.id, item]));
+    const today = toDateOnly(new Date());
 
     return [...records]
-      .sort((left, right) => right.receivedDate.getTime() - left.receivedDate.getTime())
+      .sort((left, right) => right.createdAt.getTime() - left.createdAt.getTime())
+      .filter((item) => item.registeredById === currentUser.id)
+      .filter((item) => toDateOnly(item.createdAt) === today)
       .filter((item) => (direction === "all" ? true : item.direction === direction))
       .filter((item) => {
-        const target = `${item.reference} ${item.senderReference ?? ""} ${item.subject}`.toLowerCase();
+        const target = `${item.senderReference ?? ""} ${item.subject} ${item.organisation ?? ""} ${item.fromTo}`.toLowerCase();
         return target.includes(query.trim().toLowerCase());
       })
       .map((item) => ({
         ...item,
+        createdOn: toDateOnly(item.createdAt),
+        organisationName: item.organisation?.trim() || "-",
+        senderName: item.fromTo?.trim() || "-",
         departmentName: item.departmentId
           ? departmentById.get(item.departmentId)?.code ?? item.departmentId
           : "Unassigned",
+        departmentTargetName: item.departmentId && !item.recipientId
+          ? departmentById.get(item.departmentId)?.code ?? item.departmentId
+          : "-",
         recipientName: item.recipientId
           ? userById.get(item.recipientId)?.fullName ?? item.recipientId
           : "Unassigned"
       }));
-  }, [departments, direction, query, records, users]);
+  }, [currentUser.id, departments, direction, query, records, users]);
 
   const selectedCorrespondence = useMemo(
     () => rows.find((item) => item.id === selectedId) ?? null,
@@ -145,7 +161,7 @@ export function ReceptionistDashboardPage(props: { currentUser: AppUser }): JSX.
             />
             <TextInput
               label="Search"
-              placeholder="Reference, sender reference or subject"
+              placeholder="Sender reference, subject, organisation or sender"
               value={query}
               onChange={(event) => setQuery(event.currentTarget.value)}
             />
@@ -162,27 +178,29 @@ export function ReceptionistDashboardPage(props: { currentUser: AppUser }): JSX.
             <Table striped highlightOnHover verticalSpacing="sm">
               <Table.Thead>
                 <Table.Tr>
+                  <Table.Th>Date</Table.Th>
+                  <Table.Th>Organisation</Table.Th>
+                  <Table.Th>Sender</Table.Th>
                   <Table.Th>Reference</Table.Th>
-                 
                   <Table.Th>Subject</Table.Th>
-                  <Table.Th>Type</Table.Th>
-                  <Table.Th>Department</Table.Th>
                   <Table.Th>Recipient</Table.Th>
+                  <Table.Th>Department</Table.Th>
                 </Table.Tr>
               </Table.Thead>
               <Table.Tbody>
                 {rows.map((row) => (
                   <Table.Tr key={row.id}>
+                    <Table.Td>{row.createdOn}</Table.Td>
+                    <Table.Td>{row.organisationName}</Table.Td>
+                    <Table.Td>{row.senderName}</Table.Td>
                     <Table.Td>
                       <Anchor component="button" type="button" onClick={() => setSelectedId(row.id)}>
-                      {row.senderReference ?? "-"}
+                        {row.senderReference ?? "-"}
                       </Anchor>
                     </Table.Td>
-                    
                     <Table.Td>{row.subject}</Table.Td>
-                    <Table.Td>{formatDirection(row.direction)}</Table.Td>
-                    <Table.Td>{row.departmentName}</Table.Td>
                     <Table.Td>{row.recipientName}</Table.Td>
+                    <Table.Td>{row.departmentTargetName}</Table.Td>
                   </Table.Tr>
                 ))}
               </Table.Tbody>

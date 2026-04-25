@@ -157,6 +157,11 @@ export function TaskAssignationPage(props: TaskAssignationPageProps): JSX.Elemen
         updatedBy: effectiveCurrentUser.id
       });
 
+      // Call the assignment created callback to refresh recipient list
+      if (onAssignmentCreated) {
+        await onAssignmentCreated();
+      }
+
         // SERVER mode route already appends audit; handle other adapters here.
         if (runtimePlatformTarget !== "SERVER") {
           // Update correspondence status to ASSIGNED and dueDate to the latest deadline across all tasks.

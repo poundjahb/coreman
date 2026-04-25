@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Anchor } from "@mantine/core";
-import { Badge, Card, Container, Group, Select, Stack, Table, Text, TextInput, Title } from "@mantine/core";
+import { Anchor, Card, Container, Group, Select, Stack, Table, Text, TextInput, Title } from "@mantine/core";
 import type { Correspondence } from "../../domain/correspondence";
 import type { AppUser, Branch, Department } from "../../domain/governance";
 import { runtimeHostAdapter } from "../../platform/runtimeHostAdapter";
@@ -12,10 +11,6 @@ function toDateOnly(value: Date | undefined): string {
   }
 
   return value.toISOString().slice(0, 10);
-}
-
-function formatDirection(direction: Correspondence["direction"]): string {
-  return direction === "INCOMING" ? "Incoming" : "Outgoing";
 }
 
 export function ReceptionistHistoryPage(): JSX.Element {
@@ -74,6 +69,7 @@ export function ReceptionistHistoryPage(): JSX.Element {
     const userById = new Map(users.map((item) => [item.id, item]));
 
     return [...records]
+      .sort((left, right) => right.receivedDate.getTime() - left.receivedDate.getTime())
       .filter((item) => {
         const received = toDateOnly(item.receivedDate);
         return dateFrom ? received >= dateFrom : true;
@@ -87,17 +83,15 @@ export function ReceptionistHistoryPage(): JSX.Element {
       .filter((item) => (direction === "all" ? true : item.direction === direction))
       .map((item) => ({
         ...item,
-        branchName: branchById.get(item.branchId)?.code ?? item.branchId,
-        departmentName: item.departmentId
-          ? departmentById.get(item.departmentId)?.code ?? item.departmentId
-          : "Unassigned",
-        receptionistName: userById.get(item.registeredById)?.fullName ?? item.registeredById,
+        createdOn: toDateOnly(item.createdAt),
+        organisationName: item.organisation?.trim() || "-",
+        senderName: item.fromTo?.trim() || "-",
         recipientName: item.recipientId
           ? userById.get(item.recipientId)?.fullName ?? item.recipientId
           : "Unassigned",
-        actionOwnerName: item.actionOwnerId
-          ? userById.get(item.actionOwnerId)?.fullName ?? item.actionOwnerId
-          : "Unassigned"
+        departmentTargetName: item.departmentId && !item.recipientId
+          ? departmentById.get(item.departmentId)?.code ?? item.departmentId
+          : "-"
       }));
   }, [branches, dateFrom, dateTo, departments, direction, branch, records, receptionist, users]);
 
@@ -159,42 +153,39 @@ export function ReceptionistHistoryPage(): JSX.Element {
         </Card>
 
         <Card withBorder radius="md" p="md">
-          <Table.ScrollContainer minWidth={980}>
+          <Table.ScrollContainer minWidth={960}>
             <Table striped highlightOnHover verticalSpacing="sm">
               <Table.Thead>
                 <Table.Tr>
                   <Table.Th>Date</Table.Th>
+                  <Table.Th>Organisation</Table.Th>
+                  <Table.Th>Sender</Table.Th>
                   <Table.Th>Reference</Table.Th>
                   <Table.Th>Subject</Table.Th>
-                  <Table.Th>Direction</Table.Th>
-                  <Table.Th>Branch</Table.Th>
+                  <Table.Th>Recipient</Table.Th>
                   <Table.Th>Department</Table.Th>
-                  <Table.Th>Receptionist</Table.Th>
                 </Table.Tr>
               </Table.Thead>
               <Table.Tbody>
                 {rows.map((row) => (
                   <Table.Tr key={row.id}>
-                    <Table.Td>{toDateOnly(row.receivedDate)}</Table.Td>
+                    <Table.Td>{row.createdOn}</Table.Td>
+                    <Table.Td>{row.organisationName}</Table.Td>
+                    <Table.Td>{row.senderName}</Table.Td>
                     <Table.Td>
                       <Anchor component="button" type="button" onClick={() => setSelectedId(row.id)}>
-                        {row.reference}
+                        {row.senderReference ?? "-"}
                       </Anchor>
                     </Table.Td>
                     <Table.Td>{row.subject}</Table.Td>
-                    <Table.Td>
-                      <Badge color={row.direction === "INCOMING" ? "blue" : "teal"} variant="light">
-                        {formatDirection(row.direction)}
-                      </Badge>
-                    </Table.Td>
-                    <Table.Td>{row.branchName}</Table.Td>
-                    <Table.Td>{row.departmentName}</Table.Td>
-                    <Table.Td>{row.receptionistName}</Table.Td>
+                    <Table.Td>{row.recipientName}</Table.Td>
+                    <Table.Td>{row.departmentTargetName}</Table.Td>
                   </Table.Tr>
                 ))}
               </Table.Tbody>
             </Table>
           </Table.ScrollContainer>
+          {rows.length === 0 && <Text c="dimmed" size="sm">No correspondence matched your filters.</Text>}
         </Card>
 
         <CorrespondenceDetailsDrawerContainer

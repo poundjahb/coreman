@@ -247,6 +247,97 @@ function appendAuditEvent(
   );
 }
 
+function calculateAutoCloseDueDate(dueDate: string | null, receivedDate: string): Date {
+  const baseDateStr = dueDate || receivedDate;
+  const baseDate = new Date(baseDateStr);
+  baseDate.setDate(baseDate.getDate() + 5);
+  return baseDate;
+}
+
+function getStatusChangeReason(
+  previousStatus: string,
+  newStatus: string,
+  totalTasks: number
+): string {
+  if (newStatus === "AUTO_CLOSED") {
+    return "SLA_EXPIRY_NO_ACTION";
+  }
+  if (newStatus === "IN_PROGRESS") {
+    return "TASK_STARTED";
+  }
+  if (newStatus === "CLOSED") {
+    return "ALL_TASKS_COMPLETED";
+  }
+  if (newStatus === "CANCELLED") {
+    return "ALL_TASKS_CANCELLED";
+  }
+  if (newStatus === "ASSIGNED") {
+    return "TASKS_ASSIGNED_AWAITING_START";
+  }
+  return "STATUS_UPDATED";
+}
+
+function updateCorrespondenceStatusBasedOnTasks(db: Database.Database, correspondenceId: string, actorId: string): void {
+  try {
+    const tasks = db
+      .prepare("SELECT id, status FROM correspondence_task_assignments WHERE correspondenceId = ?")
+      .all(correspondenceId) as Array<{ id: string; status: string }>;
+
+    const correspondence = db
+      .prepare("SELECT status, dueDate, receivedDate FROM correspondences WHERE id = ?")
+      .get(correspondenceId) as { status: string; dueDate: string | null; receivedDate: string } | undefined;
+
+    if (!correspondence) {
+      return;
+    }
+
+    let newStatus: string;
+    const now = new Date();
+    const autoCloseDueDate = calculateAutoCloseDueDate(correspondence.dueDate, correspondence.receivedDate);
+
+    if (now > autoCloseDueDate && !["CLOSED", "CANCELLED"].includes(correspondence.status)) {
+      newStatus = "AUTO_CLOSED";
+    } else if (tasks.length === 0) {
+      newStatus = "NEW";
+    } else {
+      const inProgressCount = tasks.filter((t) => t.status === "IN_PROGRESS").length;
+      const completedCount = tasks.filter((t) => t.status === "COMPLETED").length;
+      const cancelledCount = tasks.filter((t) => t.status === "CANCELLED").length;
+      const allTasksCancelled = cancelledCount === tasks.length;
+      const allTasksCompleted = completedCount === tasks.length;
+
+      if (inProgressCount > 0) {
+        newStatus = "IN_PROGRESS";
+      } else if (allTasksCompleted) {
+        newStatus = "CLOSED";
+      } else if (allTasksCancelled) {
+        newStatus = "CANCELLED";
+      } else {
+        newStatus = "ASSIGNED";
+      }
+    }
+
+    if (correspondence.status !== newStatus) {
+      db.prepare("UPDATE correspondences SET status = ?, updatedAt = ? WHERE id = ?")
+        .run(newStatus, new Date().toISOString(), correspondenceId);
+
+      appendAuditEvent(db, correspondenceId, "CORRESPONDENCE_STATUS_CHANGED", actorId, {
+        actionName: "CORRESPONDENCE_STATUS_AUTO_UPDATED",
+        actionSource: resolveActionSource(actorId),
+        previousStatus: correspondence.status,
+        newStatus,
+        reason: getStatusChangeReason(correspondence.status, newStatus, tasks.length),
+        totalTasks: tasks.length,
+        completedTasks: tasks.filter((t) => t.status === "COMPLETED").length,
+        inProgressTasks: tasks.filter((t) => t.status === "IN_PROGRESS").length,
+        cancelledTasks: tasks.filter((t) => t.status === "CANCELLED").length
+      });
+    }
+  } catch (error) {
+    console.error("Error updating correspondence status based on tasks:", error);
+  }
+}
+
 function appendNotificationAuditEvent(
   db: Database.Database,
   correspondenceId: string,
@@ -755,6 +846,9 @@ export function registerAssignmentsRoutes(router: Router, db: Database.Database)
             assignmentId: id,
             status: updates.status
           });
+
+          // Update correspondence status based on all linked task assignments
+          updateCorrespondenceStatusBasedOnTasks(db, assignment.correspondenceId, actorId);
         }
       }
 

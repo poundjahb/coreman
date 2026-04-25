@@ -6,8 +6,9 @@ export type CorrespondenceStatus =
   | "NEW"
   | "IN_PROGRESS"
   | "ASSIGNED"
-  | "AWAITING_REVIEW"
-  | "CLOSED";
+  | "CLOSED"
+  | "AUTO_CLOSED"
+  | "CANCELLED";
 
 export interface Correspondence {
   id: string;

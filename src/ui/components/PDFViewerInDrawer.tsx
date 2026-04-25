@@ -78,6 +78,7 @@ export function PDFViewerInDrawer({ previewUrl, downloadUrl, fileName }: PDFView
         <Group justify="center">
           <Document
             file={previewUrl}
+            options={{ withCredentials: true }}
             onLoadSuccess={onDocumentLoadSuccess}
             loading={<Loader size="sm" />}
             error={<Text c="red" size="sm">Failed to load PDF. The file may be corrupted or inaccessible.</Text>}

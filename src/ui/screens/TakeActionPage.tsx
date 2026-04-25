@@ -1,11 +1,11 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Alert,
   Button,
   Card,
-  Container,
   FileInput,
   Group,
+  Loader,
   Select,
   Stack,
   Text,
@@ -13,47 +13,208 @@ import {
   Textarea,
   Title
 } from "@mantine/core";
+import type { AppUser } from "../../domain/governance";
+import type { CorrespondenceTaskAssignment } from "../../domain/correspondenceAction";
+import { hasRole } from "../../application/services/accessControl";
+import { runtimeHostAdapter } from "../../platform/runtimeHostAdapter";
 
-export function TakeActionPage(): JSX.Element {
-  const [status, setStatus] = useState<string | null>("In Progress");
-  const [deadline, setDeadline] = useState("2026-04-24");
+interface TakeActionPageProps {
+  correspondenceId?: string;
+  currentUser?: AppUser;
+  onActionUpdated?: () => void | Promise<void>;
+}
+
+const VALID_STATUSES = ["ASSIGNED", "IN_PROGRESS", "COMPLETED", "CANCELED"];
+
+export function TakeActionPage(props: TakeActionPageProps = {}): JSX.Element {
+  const { correspondenceId, currentUser, onActionUpdated } = props;
+  const [selectedAssignmentId, setSelectedAssignmentId] = useState<string | null>(null);
+  const [assignments, setAssignments] = useState<CorrespondenceTaskAssignment[]>([]);
+  const [status, setStatus] = useState<string | null>(null);
+  const [deadline, setDeadline] = useState("");
   const [comment, setComment] = useState("");
   const [file, setFile] = useState<File | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  function handleUpdate(): void {
-    setMessage(
-      `Action updated with status ${status ?? "Unknown"}, deadline ${deadline}, comment length ${comment.length}, file ${file?.name ?? "none"}.`
-    );
+  // Load assignments for this correspondence
+  useEffect(() => {
+    let active = true;
+
+    async function loadAssignments(): Promise<void> {
+      try {
+        setLoading(true);
+        setError(null);
+
+        if (!correspondenceId) {
+          if (active) {
+            setError("No correspondence ID provided");
+          }
+          return;
+        }
+
+        const loaded = await runtimeHostAdapter.taskAssignments.findByCorrespondence(correspondenceId);
+
+        if (!active) {
+          return;
+        }
+
+        // Filter to assignments assigned to current user or show all for ADMIN
+        let filtered = loaded;
+        if (currentUser && !hasRole(currentUser, "ADMIN") && !hasRole(currentUser, "RECIPIENT")) {
+          filtered = loaded.filter((a) => a.assigneeUserId === currentUser.id);
+        }
+
+        setAssignments(filtered);
+
+        // Auto-select first assignment if available
+        if (filtered.length > 0) {
+          const firstAssignment = filtered[0];
+          setSelectedAssignmentId(firstAssignment.id);
+          setStatus(firstAssignment.status);
+          setDeadline(firstAssignment.deadline.toString());
+          setComment(firstAssignment.description ?? "");
+        } else {
+          setError("No task assignments found for this correspondence");
+        }
+      } catch (loadError) {
+        if (!active) {
+          return;
+        }
+
+        setError(loadError instanceof Error ? loadError.message : "Failed to load assignments");
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
+      }
+    }
+
+    void loadAssignments();
+
+    return () => {
+      active = false;
+    };
+  }, [correspondenceId, currentUser]);
+
+  // Handle assignment selection change
+  function handleAssignmentChange(assignmentId: string | null): void {
+    if (!assignmentId) {
+      return;
+    }
+
+    const selected = assignments.find((a) => a.id === assignmentId);
+    if (selected) {
+      setSelectedAssignmentId(assignmentId);
+      setStatus(selected.status);
+      setDeadline(selected.deadline.toString());
+      setComment(selected.description ?? "");
+    }
+  }
+
+  async function handleUpdate(): Promise<void> {
+    try {
+      setError(null);
+      setMessage(null);
+      setSaving(true);
+
+      if (!selectedAssignmentId) {
+        setError("No assignment selected");
+        return;
+      }
+
+      if (!status || !VALID_STATUSES.includes(status)) {
+        setError("Invalid status selected");
+        return;
+      }
+
+      if (!deadline) {
+        setError("Deadline is required");
+        return;
+      }
+
+      // Call update API
+      await runtimeHostAdapter.taskAssignments.update(selectedAssignmentId, {
+        status: status as "ASSIGNED" | "IN_PROGRESS" | "COMPLETED" | "CANCELED",
+        deadline: new Date(deadline),
+        description: comment.trim().length > 0 ? comment : undefined,
+        updatedBy: currentUser?.id ?? "SYSTEM"
+      });
+
+      setMessage("Action updated successfully");
+
+      // Callback to refresh parent list if provided
+      if (onActionUpdated) {
+        await onActionUpdated();
+      }
+    } catch (updateError) {
+      setError(updateError instanceof Error ? updateError.message : "Failed to update action");
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
-    <Container size="md" py="lg">
-      <Stack gap="lg">
-        <div>
-          <Title order={2}>Take Action</Title>
-          <Text c="dimmed" size="sm">Update deadline, status, comments, and attach supporting files.</Text>
-        </div>
+    <Stack gap="lg">
+      <div>
+        <Title order={2}>Take Action</Title>
+        <Text c="dimmed" size="sm">Update deadline, status, comments, and attach supporting files.</Text>
+      </div>
 
+      {loading && (
+        <Card withBorder radius="md" p="md">
+          <Group justify="center">
+            <Loader size="sm" />
+            <Text size="sm">Loading task assignments...</Text>
+          </Group>
+        </Card>
+      )}
+
+      {!loading && error && (
+        <Alert color="red" title="Error">
+          {error}
+        </Alert>
+      )}
+
+      {!loading && assignments.length > 0 && (
         <Card withBorder radius="md" p="md">
           <Stack gap="md">
+            {assignments.length > 1 && (
+              <Select
+                label="Select task to update"
+                value={selectedAssignmentId}
+                onChange={handleAssignmentChange}
+                data={assignments.map((a) => ({
+                  value: a.id,
+                  label: `Task: ${a.description || a.id} (${a.status})`
+                }))}
+                searchable
+              />
+            )}
+
             <Select
               label="Task status"
               value={status}
               onChange={setStatus}
               data={[
-                { value: "Assigned", label: "Assigned" },
-                { value: "In Progress", label: "In Progress" },
-                { value: "Blocked", label: "Blocked" },
-                { value: "Completed", label: "Completed" }
+                { value: "ASSIGNED", label: "Assigned" },
+                { value: "IN_PROGRESS", label: "In Progress" },
+                { value: "COMPLETED", label: "Completed" },
+                { value: "CANCELED", label: "Canceled" }
               ]}
+              required
             />
+
             <TextInput
               label="Deadline"
               type="date"
               value={deadline}
               onChange={(event) => setDeadline(event.currentTarget.value)}
+              required
             />
+
             <Textarea
               label="Action comment"
               minRows={4}
@@ -61,25 +222,33 @@ export function TakeActionPage(): JSX.Element {
               value={comment}
               onChange={(event) => setComment(event.currentTarget.value)}
             />
+
             <FileInput
-              label="Upload file"
+              label="Upload file (optional)"
               placeholder="Attach evidence or response file"
               value={file}
               onChange={setFile}
               clearable
             />
+
             <Group justify="flex-end">
-              <Button onClick={handleUpdate}>Save Update</Button>
+              <Button
+                onClick={() => void handleUpdate()}
+                loading={saving}
+                disabled={!status || !deadline || saving}
+              >
+                Save Update
+              </Button>
             </Group>
           </Stack>
         </Card>
+      )}
 
-        {message && (
-          <Alert color="green" title="Update saved">
-            {message}
-          </Alert>
-        )}
-      </Stack>
-    </Container>
+      {message && (
+        <Alert color="green" title="Update saved">
+          {message}
+        </Alert>
+      )}
+    </Stack>
   );
 }

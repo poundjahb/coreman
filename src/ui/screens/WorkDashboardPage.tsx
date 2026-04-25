@@ -14,7 +14,6 @@ import {
   Text,
   Title
 } from "@mantine/core";
-import { Link } from "react-router-dom";
 import { KpiCard } from "../components/KpiCard";
 import type { AppUser } from "../../domain/governance";
 import type { Correspondence } from "../../domain/correspondence";
@@ -22,6 +21,7 @@ import { hasRole } from "../../application/services/accessControl";
 import { runtimeHostAdapter } from "../../platform/runtimeHostAdapter";
 import { CorrespondenceDetailsDrawerContainer } from "../components/CorrespondenceDetailsDrawerContainer";
 import { TaskAssignationPage } from "./TaskAssignationPage";
+import { TakeActionPage } from "./TakeActionPage";
 
 interface WorkDashboardPageProps {
   currentUser: AppUser;
@@ -39,9 +39,10 @@ export function WorkDashboardPage({ currentUser }: WorkDashboardPageProps): JSX.
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [assignDrawerOpened, setAssignDrawerOpened] = useState(false);
   const [assignCorrespondenceId, setAssignCorrespondenceId] = useState<string | null>(null);
+  const [takeActionDrawerOpened, setTakeActionDrawerOpened] = useState(false);
+  const [takeActionCorrespondenceId, setTakeActionCorrespondenceId] = useState<string | null>(null);
   const [records, setRecords] = useState<Correspondence[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [usedFallbackScope, setUsedFallbackScope] = useState<boolean>(false);
 
   useEffect(() => {
     let active = true;
@@ -49,34 +50,20 @@ export function WorkDashboardPage({ currentUser }: WorkDashboardPageProps): JSX.
     async function loadRecords(): Promise<void> {
       try {
         setError(null);
-        setUsedFallbackScope(false);
 
-        let loaded: Correspondence[];
-        if (hasRole(currentUser, "ADMIN")) {
-          loaded = await runtimeHostAdapter.correspondences.findAll();
-        } else {
-          const byBranch = await runtimeHostAdapter.correspondences.findByBranch(currentUser.branchId);
-          if (byBranch.length > 0) {
-            loaded = byBranch;
-          } else {
-            const all = await runtimeHostAdapter.correspondences.findAll();
-            const assignedToCurrentUser = all.filter(
-              (item) =>
-                item.recipientId === currentUser.id
-                || item.actionOwnerId === currentUser.id
-                || item.registeredById === currentUser.id
-            );
-
-            loaded = assignedToCurrentUser.length > 0 ? assignedToCurrentUser : all;
-            setUsedFallbackScope(true);
-          }
-        }
+        // Load all correspondences and filter to only those assigned to current user
+        const all = await runtimeHostAdapter.correspondences.findAll();
+        const assignedToCurrentUser = all.filter(
+          (item) =>
+            item.recipientId === currentUser.id
+            || item.actionOwnerId === currentUser.id
+        );
 
         if (!active) {
           return;
         }
 
-        setRecords(loaded);
+        setRecords(assignedToCurrentUser);
 
       } catch (loadError) {
         if (!active) {
@@ -94,11 +81,17 @@ export function WorkDashboardPage({ currentUser }: WorkDashboardPageProps): JSX.
     };
   }, [currentUser]);
 
+  // Filter out closed correspondences from dashboard display
+  const activeRecords = useMemo(
+    () => records.filter((item) => !["CLOSED", "AUTO_CLOSED", "CANCELLED"].includes(item.status)),
+    [records]
+  );
+
   const stats = useMemo(() => {
-    const completed = records.filter((item) => item.status === "CLOSED").length;
-    const completion = records.length === 0 ? 0 : Math.round((completed / records.length) * 100);
+    const completed = activeRecords.filter((item) => item.status === "CLOSED").length;
+    const completion = activeRecords.length === 0 ? 0 : Math.round((completed / activeRecords.length) * 100);
     const nowIsoDate = new Date().toISOString().slice(0, 10);
-    const overdue = records.filter((item) => {
+    const overdue = activeRecords.filter((item) => {
       if (!item.dueDate || item.status === "CLOSED") {
         return false;
       }
@@ -106,7 +99,7 @@ export function WorkDashboardPage({ currentUser }: WorkDashboardPageProps): JSX.
       return item.dueDate.toISOString().slice(0, 10) < nowIsoDate;
     }).length;
     const escalated = 0;
-    const pending = records.filter((item) => item.status !== "CLOSED").length;
+    const pending = activeRecords.filter((item) => item.status !== "CLOSED").length;
 
     return {
       completion,
@@ -114,11 +107,28 @@ export function WorkDashboardPage({ currentUser }: WorkDashboardPageProps): JSX.
       escalated,
       pending
     };
-  }, [records]);
+  }, [activeRecords]);
 
   const isRecipient = hasRole(currentUser, "RECIPIENT") || hasRole(currentUser, "ADMIN");
   const isActionOwner = hasRole(currentUser, "ACTION_OWNER") || hasRole(currentUser, "ADMIN");
-  const selectedCorrespondence = records.find((item) => item.id === selectedId) ?? null;
+  const selectedCorrespondence = activeRecords.find((item) => item.id === selectedId) ?? null;
+
+  const handleAssignmentCreated = async (): Promise<void> => {
+    // Refresh the correspondence list after task assignment
+    try {
+      setError(null);
+      const all = await runtimeHostAdapter.correspondences.findAll();
+      const assignedToCurrentUser = all.filter(
+        (item) =>
+          item.recipientId === currentUser.id
+          || item.actionOwnerId === currentUser.id
+      );
+      setRecords(assignedToCurrentUser);
+    } catch (refreshError) {
+      // Non-fatal — assignment succeeded but refresh failed
+      console.error("Failed to refresh correspondence list after assignment:", refreshError);
+    }
+  };
 
   return (
     <Container size="xl" py="lg">
@@ -138,14 +148,9 @@ export function WorkDashboardPage({ currentUser }: WorkDashboardPageProps): JSX.
         <Card withBorder radius="md" p="md">
           <Group justify="space-between" mb="sm">
             <Title order={4}>Received Correspondences</Title>
-            <Badge variant="light">{records.length} items</Badge>
+            <Badge variant="light">{activeRecords.length} items</Badge>
           </Group>
           {error && <Text c="red" size="sm" mb="sm">{error}</Text>}
-          {!error && usedFallbackScope && (
-            <Text c="dimmed" size="xs" mb="sm">
-              Branch-specific records were empty; showing available correspondences for visibility.
-            </Text>
-          )}
           <Table.ScrollContainer minWidth={980}>
             <Table striped highlightOnHover verticalSpacing="xs">
               <Table.Thead>
@@ -159,7 +164,7 @@ export function WorkDashboardPage({ currentUser }: WorkDashboardPageProps): JSX.
                 </Table.Tr>
               </Table.Thead>
               <Table.Tbody>
-                {records.map((row) => (
+                {activeRecords.map((row) => (
                   <Table.Tr key={row.id}>
                     <Table.Td>
                       <Anchor
@@ -191,7 +196,10 @@ export function WorkDashboardPage({ currentUser }: WorkDashboardPageProps): JSX.
                             </Menu.Item>
                           )}
                           {isActionOwner && (
-                            <Menu.Item component={Link} to="/tasks/action">
+                            <Menu.Item onClick={() => {
+                              setTakeActionCorrespondenceId(row.id);
+                              setTakeActionDrawerOpened(true);
+                            }}>
                               Take Action
                             </Menu.Item>
                           )}
@@ -226,6 +234,25 @@ export function WorkDashboardPage({ currentUser }: WorkDashboardPageProps): JSX.
           <TaskAssignationPage
             correspondenceId={assignCorrespondenceId ?? undefined}
             currentUser={currentUser}
+            onAssignmentCreated={handleAssignmentCreated}
+          />
+        </Drawer>
+
+        <Drawer
+          opened={takeActionDrawerOpened}
+          onClose={() => {
+            setTakeActionDrawerOpened(false);
+            setTakeActionCorrespondenceId(null);
+          }}
+          position="right"
+          size="xl"
+          title="Take Action"
+          overlayProps={{ opacity: 0.25, blur: 2 }}
+        >
+          <TakeActionPage
+            correspondenceId={takeActionCorrespondenceId ?? undefined}
+            currentUser={currentUser}
+            onActionUpdated={handleAssignmentCreated}
           />
         </Drawer>
 

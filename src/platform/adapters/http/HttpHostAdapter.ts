@@ -63,9 +63,27 @@ function serializeQuery(query?: Record<string, string | undefined>): string {
   return raw.length > 0 ? `?${raw}` : "";
 }
 
+function resolveUserId(user: AppUser | string | undefined): string | undefined {
+  if (!user) {
+    return undefined;
+  }
+
+  if (typeof user === "string") {
+    return user;
+  }
+
+  return user.id;
+}
+
 function hydrateCorrespondence(raw: Correspondence): Correspondence {
+  const createBy = (raw as Correspondence & { createBy?: AppUser | string }).createBy;
+  const registeredById = (raw as Correspondence & { registeredById?: string }).registeredById
+    ?? resolveUserId(createBy)
+    ?? "";
+
   return {
     ...raw,
+    registeredById,
     correspondenceDate: raw.correspondenceDate ? new Date(raw.correspondenceDate) : undefined,
     receivedDate: new Date(raw.receivedDate),
     dueDate: raw.dueDate ? new Date(raw.dueDate) : undefined,
