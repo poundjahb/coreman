@@ -12,20 +12,17 @@ import {
   TextInput,
   Title,
   Select,
-  PasswordInput,
-  Textarea
+  PasswordInput
 } from "@mantine/core";
 import type { EmailConfig } from "../../../platform/contracts/IEmailService";
 import { runtimeHostAdapter, runtimePlatformTarget } from "../../../platform/runtimeHostAdapter";
 import {
   loadEmailSettingsConfig,
   saveEmailSettingsConfig,
-  sendEmailTestUsingSavedConfig,
-  getEmailBackendDescription
+  sendEmailTestUsingSavedConfig
 } from "../../../application/modules/admin/emailSettings";
 
-export function AdminEmailSettingsPage(props?: { embedded?: boolean }): JSX.Element {
-  const embedded = props?.embedded ?? false;
+export function AdminEmailSettingsPage(_props?: { embedded?: boolean }): JSX.Element {
   const activePlatformTarget = runtimeHostAdapter.platform.target;
   const configuredPlatformTarget = runtimePlatformTarget;
   const hasPlatformFallback = configuredPlatformTarget !== activePlatformTarget;
@@ -218,8 +215,6 @@ export function AdminEmailSettingsPage(props?: { embedded?: boolean }): JSX.Elem
   }
 
   const formHasChanges = getFormSignature(form) !== savedFormSignature;
-  const backendDescription = form.backendType === "SMTP" ? `(${form.smtpHost}:${form.smtpPort})` : "";
-
   return (
     <Container size="md" py="xl">
       <Card shadow="sm" padding="lg" radius="md" withBorder>
@@ -446,7 +441,7 @@ export function AdminEmailSettingsPage(props?: { embedded?: boolean }): JSX.Elem
                   </Button>
 
                   {formHasChanges && (
-                    <Alert color="yellow" size="sm">
+                    <Alert color="yellow">
                       Please save configuration before sending a test email.
                     </Alert>
                   )}

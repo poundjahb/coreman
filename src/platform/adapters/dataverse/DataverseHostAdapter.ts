@@ -9,6 +9,7 @@ import type { ICorrespondenceAuditLogRepository } from "../../contracts/ICorresp
 import type { IPostCaptureWorkflowService } from "../../contracts/IPostCaptureWorkflowService";
 import type { ISmtpSettingsService } from "../../contracts/ISmtpSettingsService";
 import type { IEmailService } from "../../contracts/IEmailService";
+import type { IWorkflowPluginService } from "../../contracts/IWorkflowPluginService";
 import type { SequenceStore } from "../../../domain/reference";
 import type { ICorrespondenceActionDefinitionRepository } from "../../contracts/ICorrespondenceActionDefinitionRepository";
 import type { ICorrespondenceTaskAssignmentRepository } from "../../contracts/ICorrespondenceTaskAssignmentRepository";
@@ -106,6 +107,16 @@ const dataverseEmailSettings: IEmailService = {
   sendEmail: () => notImplemented("emailSettings.sendEmail")
 };
 
+const dataverseWorkflowPlugins: IWorkflowPluginService = {
+  getCatalog: () => notImplemented("workflowPlugins.getCatalog"),
+  listPlugins: () => notImplemented("workflowPlugins.listPlugins"),
+  refresh: () => notImplemented("workflowPlugins.refresh"),
+  setPluginEnabled: () => notImplemented("workflowPlugins.setPluginEnabled"),
+  listBindings: () => notImplemented("workflowPlugins.listBindings"),
+  saveBinding: () => notImplemented("workflowPlugins.saveBinding"),
+  deleteBinding: () => notImplemented("workflowPlugins.deleteBinding")
+};
+
 export const dataverseHostAdapter: IHostAdapter = {
   platform: dataversePlatformIndicator,
   correspondences: dataverseCorrespondenceRepository,
@@ -120,5 +131,6 @@ export const dataverseHostAdapter: IHostAdapter = {
   notifications: dataverseNotificationService,
   correspondenceAuditLog: dataverseAuditLog,
   postCaptureWorkflow: dataversePostCaptureWorkflow,
+  workflowPlugins: dataverseWorkflowPlugins,
   sequenceStore: dataverseSequenceStore
 };

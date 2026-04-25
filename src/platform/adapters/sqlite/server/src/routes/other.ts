@@ -6,6 +6,7 @@ import { randomUUID } from "crypto";
 import { fileURLToPath } from "url";
 import multer from "multer";
 import nodemailer from "nodemailer";
+import { executeWorkflowTrigger } from "../workflows/engine.js";
 
 type CorrespondenceAuditEventType =
   | "CORRESPONDENCE_CREATED"
@@ -1408,6 +1409,24 @@ export function registerOtherRoutes(router: Router, db: Database.Database): void
       const correspondence = command.correspondence;
       const actor = command.actor;
       const recipientId = correspondence.recipientId ?? correspondence.actionOwnerId ?? actor.id;
+
+      const pluginOutcome = await executeWorkflowTrigger(db, {
+        eventCode: "CORRESPONDENCE_CREATED",
+        correspondenceId: correspondence.id,
+        actorId: actor.id,
+        mode: command.mode,
+        context: {
+          reference: correspondence.reference,
+          subject: correspondence.subject,
+          recipientId,
+          ...(command.context ?? {})
+        }
+      });
+
+      if (pluginOutcome.status !== "SKIPPED") {
+        res.status(200).json({ message: "Workflow execution completed", pluginOutcome });
+        return;
+      }
 
       if (command.mode === "EXTENDED") {
         appendAuditEvent(db, {

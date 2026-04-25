@@ -175,6 +175,7 @@ function getRoleMenuSections(currentUser: AppUser): RoleMenuSection[] {
         { label: "User", to: "/admin/users", icon: <Users size={16} /> },
         { label: "Reference Data", to: "/admin/reference", icon: <Building2 size={16} /> },
         { label: "System Control", to: "/admin/system", icon: <Settings size={16} /> },
+        { label: "Flow and Agents", to: "/admin/flow", icon: <Settings size={16} /> },
         { label: "System Health", to: "/admin/health", icon: <Activity size={16} /> }
       ]
     });
@@ -362,11 +363,10 @@ export function App(): JSX.Element {
     async function loadStartupData(): Promise<void> {
       try {
         setStartupState({ loading: true, error: null, issues: [] });
-        const [users, branches, departments, referenceConfigs] = await Promise.all([
+        const [users, branches, departments] = await Promise.all([
           runtimeHostAdapter.users.findAll(),
           runtimeHostAdapter.branches.findAll(),
-          runtimeHostAdapter.departments.findAll(),
-          runtimeHostAdapter.referenceConfigs.findActive()
+          runtimeHostAdapter.departments.findAll()
         ]);
 
         if (!active) {

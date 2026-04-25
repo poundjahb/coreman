@@ -2,7 +2,7 @@
  * Application module for email settings management.
  * Routes to correct backend implementation based on configured type (SMTP, Graph Mail API, or Resend).
  */
-import type { EmailConfig, IEmailService } from "../../../platform/contracts/IEmailService";
+import type { EmailConfig } from "../../../platform/contracts/IEmailService";
 import { runtimeHostAdapter } from "../../../platform/runtimeHostAdapter";
 
 export interface SendEmailTestInput {
@@ -56,7 +56,7 @@ export async function sendEmailTestUsingSavedConfig(input: SendEmailTestInput): 
 export async function getEmailBackendDescription(): Promise<string> {
   try {
     const config = await loadEmailSettingsConfig();
-    
+
     switch (config.backendType) {
       case "SMTP":
         return `SMTP (${config.smtpHost}:${config.smtpPort}, TLS: ${config.smtpSecure ? "ON" : "OFF"})`;

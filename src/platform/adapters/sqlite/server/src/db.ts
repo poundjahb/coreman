@@ -259,7 +259,49 @@ export function initializeDatabase(): Database.Database {
       connectionTimeoutMs INTEGER NOT NULL,
       updatedAt TEXT NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS workflow_plugins (
+      pluginKey TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      description TEXT NOT NULL,
+      version TEXT NOT NULL,
+      apiVersion TEXT NOT NULL,
+      platformTarget TEXT NOT NULL,
+      supportedTriggersJson TEXT NOT NULL,
+      entryFile TEXT NOT NULL,
+      sourcePath TEXT NOT NULL,
+      checksum TEXT NOT NULL,
+      isEnabled INTEGER NOT NULL DEFAULT 1,
+      isValid INTEGER NOT NULL DEFAULT 1,
+      validationErrorsJson TEXT,
+      discoveredAt TEXT NOT NULL,
+      updatedAt TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS workflow_bindings (
+      id TEXT PRIMARY KEY,
+      bindingType TEXT NOT NULL,
+      triggerCode TEXT,
+      actionDefinitionId TEXT,
+      pluginKey TEXT NOT NULL,
+      priority INTEGER NOT NULL DEFAULT 100,
+      isActive INTEGER NOT NULL DEFAULT 1,
+      createdBy TEXT NOT NULL,
+      updatedBy TEXT NOT NULL,
+      createdAt TEXT NOT NULL,
+      updatedAt TEXT NOT NULL,
+      CHECK (
+        (bindingType = 'EVENT' AND triggerCode IS NOT NULL AND actionDefinitionId IS NULL)
+        OR
+        (bindingType = 'ACTION' AND actionDefinitionId IS NOT NULL AND triggerCode IS NULL)
+      )
+    );
   `);
+
+  db.exec("CREATE INDEX IF NOT EXISTS idx_workflow_plugins_platform_enabled ON workflow_plugins (platformTarget, isEnabled)");
+  db.exec("CREATE INDEX IF NOT EXISTS idx_workflow_bindings_type_active ON workflow_bindings (bindingType, isActive)");
+  db.exec("CREATE INDEX IF NOT EXISTS idx_workflow_bindings_trigger ON workflow_bindings (triggerCode)");
+  db.exec("CREATE INDEX IF NOT EXISTS idx_workflow_bindings_action ON workflow_bindings (actionDefinitionId)");
 
   const correspondenceColumns = db.prepare("PRAGMA table_info(correspondences)").all() as Array<{ name: string }>;
   const hasSenderReference = correspondenceColumns.some((column) => column.name === "senderReference");
@@ -332,6 +374,16 @@ export function initializeDatabase(): Database.Database {
   const hasAuditCreatedById = auditColumns.some((column) => column.name === "createdById");
   if (!hasAuditCreatedById) {
     db.exec("ALTER TABLE correspondence_audit_log ADD COLUMN createdById TEXT");
+  }
+
+  const workflowPluginColumns = db.prepare("PRAGMA table_info(workflow_plugins)").all() as Array<{ name: string }>;
+  if (!workflowPluginColumns.some((column) => column.name === "validationErrorsJson")) {
+    db.exec("ALTER TABLE workflow_plugins ADD COLUMN validationErrorsJson TEXT");
+  }
+
+  const workflowBindingColumns = db.prepare("PRAGMA table_info(workflow_bindings)").all() as Array<{ name: string }>;
+  if (!workflowBindingColumns.some((column) => column.name === "priority")) {
+    db.exec("ALTER TABLE workflow_bindings ADD COLUMN priority INTEGER NOT NULL DEFAULT 100");
   }
 
   db.exec("UPDATE correspondence_audit_log SET createdById = createdBy WHERE createdById IS NULL");

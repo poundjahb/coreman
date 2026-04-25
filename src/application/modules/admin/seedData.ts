@@ -197,7 +197,7 @@ export const demoCorrespondences: Correspondence[] = [
     registeredById: "u-001",
     recipientId: "u-005",
     actionOwnerId: "u-002",
-    status: "AWAITING_REVIEW",
+    status: "IN_PROGRESS",
     receivedDate: new Date("2026-04-20T00:00:00.000Z"),
     dueDate: new Date("2026-04-23T00:00:00.000Z"),
     createdAt: new Date("2026-04-20T09:00:00.000Z"),

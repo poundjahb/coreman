@@ -1,0 +1,14 @@
+{
+  "pluginKey": "sample-notify-owner",
+  "name": "Sample Notify Owner",
+  "description": "Demonstration plugin that sends a basic owner notification for correspondence and assignment triggers.",
+  "version": "1.0.0",
+  "apiVersion": "1.0",
+  "platformTarget": "SERVER",
+  "supportedTriggers": [
+    "CORRESPONDENCE_CREATED",
+    "ASSIGNMENT_CREATED"
+  ],
+  "entryFile": "index.mjs",
+  "enabledByDefault": true
+}

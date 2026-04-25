@@ -124,8 +124,11 @@ test("registerCorrespondenceInHost runs basic workflow transparently", async () 
     assert.equal(notifications.sent[0]?.correspondenceId, result.correspondenceId);
 
     const events = await auditLog.findByCorrespondence(result.correspondenceId);
-    assert.equal(events.length, 1);
-    assert.equal(events[0]?.eventType, "NOTIFICATION_SENT");
+    assert.equal(events.length, 2);
+    assert.deepEqual(
+      events.map((event) => event.eventType),
+      ["CORRESPONDENCE_CREATED", "NOTIFICATION_SENT"]
+    );
   } finally {
     workflowConfig.mode = previousMode;
   }
@@ -159,10 +162,10 @@ test("registerCorrespondenceInHost runs extended workflow and records three audi
 
     assert.equal(notifications.sent.length, 1);
     const events = await auditLog.findByCorrespondence(result.correspondenceId);
-    assert.equal(events.length, 3);
+    assert.equal(events.length, 4);
     assert.deepEqual(
       events.map((event) => event.eventType),
-      ["AGENT_CALL", "AGENT_RESPONSE", "NOTIFICATION_SENT"]
+      ["CORRESPONDENCE_CREATED", "AGENT_CALL", "AGENT_RESPONSE", "NOTIFICATION_SENT"]
     );
   } finally {
     workflowConfig.mode = previousMode;
@@ -198,9 +201,10 @@ test("registerCorrespondenceInHost keeps capture successful when workflow fails"
 
     const auditLog = adapter.correspondenceAuditLog as InMemoryCorrespondenceAuditLogRepository;
     const events = await auditLog.findByCorrespondence(result.correspondenceId);
-    assert.equal(events.length, 1);
-    assert.equal(events[0]?.eventType, "WORKFLOW_FAILURE");
-    assert.equal(events[0]?.status, "FAILED");
+    assert.equal(events.length, 2);
+    assert.equal(events[0]?.eventType, "CORRESPONDENCE_CREATED");
+    assert.equal(events[1]?.eventType, "WORKFLOW_FAILURE");
+    assert.equal(events[1]?.status, "FAILED");
   } finally {
     workflowConfig.mode = previousMode;
   }

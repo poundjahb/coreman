@@ -66,7 +66,6 @@ export function ReceptionistHistoryPage(props: { currentUser: AppUser }): JSX.El
   }, []);
 
   const rows = useMemo(() => {
-    const branchById = new Map(branches.map((item) => [item.id, item]));
     const departmentById = new Map(departments.map((item) => [item.id, item]));
     const userById = new Map(users.map((item) => [item.id, item]));
 

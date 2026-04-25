@@ -45,9 +45,11 @@ function createStoredCorrespondence(actor: Awaited<ReturnType<ReturnType<typeof 
 test("SQLite workflow service logs a BASIC notification event", async () => {
   const tempDir = mkdtempSync(join(tmpdir(), "coreman-sqlite-workflow-"));
   const dbPath = join(tempDir, "coreman.db");
+  let adapter: (ReturnType<typeof createSqliteHostAdapter> & { close?: () => void }) | null = null;
+  let auditDb: ReturnType<typeof openDatabase> | null = null;
 
   try {
-    const adapter = createSqliteHostAdapter(dbPath);
+    adapter = createSqliteHostAdapter(dbPath) as ReturnType<typeof createSqliteHostAdapter> & { close?: () => void };
     const [actor] = await adapter.users.findAll();
     assert.ok(actor);
 
@@ -55,7 +57,8 @@ test("SQLite workflow service logs a BASIC notification event", async () => {
     await adapter.correspondences.save(correspondence);
 
     const notifications = new RecordingNotificationService();
-    const auditLog = new SqliteCorrespondenceAuditLogRepository(openDatabase(dbPath));
+  auditDb = openDatabase(dbPath);
+  const auditLog = new SqliteCorrespondenceAuditLogRepository(auditDb);
     const service = new SqlitePostCaptureWorkflowService(notifications, auditLog);
 
     await service.execute({
@@ -71,6 +74,8 @@ test("SQLite workflow service logs a BASIC notification event", async () => {
     assert.equal(events.length, 1);
     assert.equal(events[0]?.eventType, "NOTIFICATION_SENT");
   } finally {
+    auditDb?.close();
+    adapter?.close?.();
     rmSync(tempDir, { recursive: true, force: true });
   }
 });
@@ -78,9 +83,11 @@ test("SQLite workflow service logs a BASIC notification event", async () => {
 test("SQLite workflow service logs extended workflow audit trail", async () => {
   const tempDir = mkdtempSync(join(tmpdir(), "coreman-sqlite-workflow-"));
   const dbPath = join(tempDir, "coreman.db");
+  let adapter: (ReturnType<typeof createSqliteHostAdapter> & { close?: () => void }) | null = null;
+  let auditDb: ReturnType<typeof openDatabase> | null = null;
 
   try {
-    const adapter = createSqliteHostAdapter(dbPath);
+    adapter = createSqliteHostAdapter(dbPath) as ReturnType<typeof createSqliteHostAdapter> & { close?: () => void };
     const [actor] = await adapter.users.findAll();
     assert.ok(actor);
 
@@ -88,7 +95,8 @@ test("SQLite workflow service logs extended workflow audit trail", async () => {
     await adapter.correspondences.save(correspondence);
 
     const notifications = new RecordingNotificationService();
-    const auditLog = new SqliteCorrespondenceAuditLogRepository(openDatabase(dbPath));
+  auditDb = openDatabase(dbPath);
+  const auditLog = new SqliteCorrespondenceAuditLogRepository(auditDb);
     const service = new SqlitePostCaptureWorkflowService(notifications, auditLog);
 
     await service.execute({
@@ -115,6 +123,8 @@ test("SQLite workflow service logs extended workflow audit trail", async () => {
       ["AGENT_CALL", "AGENT_RESPONSE", "NOTIFICATION_SENT"]
     );
   } finally {
+    auditDb?.close();
+    adapter?.close?.();
     rmSync(tempDir, { recursive: true, force: true });
   }
 });

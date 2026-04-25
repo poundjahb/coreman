@@ -2,6 +2,7 @@ import type { Router, Request, Response } from "express";
 import type Database from "better-sqlite3";
 import { randomUUID } from "crypto";
 import nodemailer from "nodemailer";
+import { executeWorkflowTrigger } from "../workflows/engine.js";
 
 const ALLOWED_STATUSES = new Set(["ASSIGNED", "IN_PROGRESS", "COMPLETED", "CANCELED"]);
 
@@ -255,9 +256,7 @@ function calculateAutoCloseDueDate(dueDate: string | null, receivedDate: string)
 }
 
 function getStatusChangeReason(
-  previousStatus: string,
   newStatus: string,
-  totalTasks: number
 ): string {
   if (newStatus === "AUTO_CLOSED") {
     return "SLA_EXPIRY_NO_ACTION";
@@ -326,7 +325,7 @@ function updateCorrespondenceStatusBasedOnTasks(db: Database.Database, correspon
         actionSource: resolveActionSource(actorId),
         previousStatus: correspondence.status,
         newStatus,
-        reason: getStatusChangeReason(correspondence.status, newStatus, tasks.length),
+        reason: getStatusChangeReason(newStatus),
         totalTasks: tasks.length,
         completedTasks: tasks.filter((t) => t.status === "COMPLETED").length,
         inProgressTasks: tasks.filter((t) => t.status === "IN_PROGRESS").length,
@@ -633,35 +632,52 @@ export function registerAssignmentsRoutes(router: Router, db: Database.Database)
 
       const workflowMode = resolveWorkflowMode();
       try {
-        const notificationOutcome = await dispatchAssignmentNotification(
-          db,
-          {
-            id,
-            correspondenceId,
-            actionDefinitionId,
+        const pluginOutcome = await executeWorkflowTrigger(db, {
+          eventCode: "ASSIGNMENT_CREATED",
+          actionDefinitionId,
+          correspondenceId,
+          actorId: createdBy,
+          mode: workflowMode,
+          context: {
+            assignmentId: id,
             assigneeUserId,
-            deadline
-          },
-          createdBy,
-          workflowMode
-        );
+            deadline,
+            ccUserIds,
+            description: typeof description === "string" ? description : undefined
+          }
+        });
 
-        if (notificationOutcome === "FAILED") {
-          appendNotificationAuditEvent(
+        if (pluginOutcome.status === "SKIPPED") {
+          const notificationOutcome = await dispatchAssignmentNotification(
             db,
-            correspondenceId,
-            "WORKFLOW_FAILURE",
-            "FAILED",
-            createdBy,
             {
-              mode: workflowMode,
-              actionName: "ASSIGNMENT_WORKFLOW",
-              assignmentId: id,
-              notificationOutcome,
-              actionSource: resolveActionSource(createdBy)
+              id,
+              correspondenceId,
+              actionDefinitionId,
+              assigneeUserId,
+              deadline
             },
-            "Assignment workflow notification failed"
+            createdBy,
+            workflowMode
           );
+
+          if (notificationOutcome === "FAILED") {
+            appendNotificationAuditEvent(
+              db,
+              correspondenceId,
+              "WORKFLOW_FAILURE",
+              "FAILED",
+              createdBy,
+              {
+                mode: workflowMode,
+                actionName: "ASSIGNMENT_WORKFLOW",
+                assignmentId: id,
+                notificationOutcome,
+                actionSource: resolveActionSource(createdBy)
+              },
+              "Assignment workflow notification failed"
+            );
+          }
         }
       } catch (error) {
         appendNotificationAuditEvent(

@@ -5,8 +5,26 @@ import type { ICorrespondenceRepository } from "../../contracts/ICorrespondenceR
 
 type CorrespondenceRow = Omit<
   Correspondence,
-  "correspondenceDate" | "receivedDate" | "dueDate" | "createdAt" | "updatedAt" | "createBy" | "updateBy"
+  | "senderReference"
+  | "summary"
+  | "organisation"
+  | "departmentId"
+  | "recipientId"
+  | "actionOwnerId"
+  | "correspondenceDate"
+  | "receivedDate"
+  | "dueDate"
+  | "createdAt"
+  | "updatedAt"
+  | "createBy"
+  | "updateBy"
 > & {
+  senderReference?: string | null;
+  summary?: string | null;
+  organisation?: string | null;
+  departmentId?: string | null;
+  recipientId?: string | null;
+  actionOwnerId?: string | null;
   correspondenceDate?: string | null;
   receivedDate: string;
   dueDate?: string | null;
@@ -67,6 +85,12 @@ function resolveAuditUser(userId: string | null | undefined, fallbackId: string,
 function toRow(correspondence: Correspondence): CorrespondenceRow {
   return {
     ...correspondence,
+    senderReference: correspondence.senderReference ?? null,
+    summary: correspondence.summary ?? null,
+    organisation: correspondence.organisation ?? null,
+    departmentId: correspondence.departmentId ?? null,
+    recipientId: correspondence.recipientId ?? null,
+    actionOwnerId: correspondence.actionOwnerId ?? null,
     createById: correspondence.createBy.id,
     updateById: correspondence.updateBy.id,
     correspondenceDate: correspondence.correspondenceDate
@@ -82,6 +106,12 @@ function toRow(correspondence: Correspondence): CorrespondenceRow {
 function fromRow(row: CorrespondenceRow, usersById: Map<string, AppUser>): Correspondence {
   return {
     ...row,
+    senderReference: row.senderReference ?? undefined,
+    summary: row.summary ?? undefined,
+    organisation: row.organisation ?? undefined,
+    departmentId: row.departmentId ?? undefined,
+    recipientId: row.recipientId ?? undefined,
+    actionOwnerId: row.actionOwnerId ?? undefined,
     correspondenceDate: row.correspondenceDate ? new Date(row.correspondenceDate) : undefined,
     receivedDate: new Date(row.receivedDate),
     dueDate: row.dueDate ? new Date(row.dueDate) : undefined,

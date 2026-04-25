@@ -9,9 +9,10 @@ import { createSqliteHostAdapter } from "../src/platform/adapters/sqlite/SqliteH
 test("SQLite clean install bootstraps minimal required records", async () => {
   const tempDir = mkdtempSync(join(tmpdir(), "coreman-bootstrap-"));
   const dbPath = join(tempDir, "coreman.db");
+  let adapter: (ReturnType<typeof createSqliteHostAdapter> & { close?: () => void }) | null = null;
 
   try {
-    const adapter = createSqliteHostAdapter(dbPath);
+    adapter = createSqliteHostAdapter(dbPath) as ReturnType<typeof createSqliteHostAdapter> & { close?: () => void };
     const [users, branches, departments, configs, correspondences, actionDefinitions, smtpConfig] = await Promise.all([
       adapter.users.findAll(),
       adapter.branches.findAll(),
@@ -29,7 +30,7 @@ test("SQLite clean install bootstraps minimal required records", async () => {
     assert.equal(departments[0]?.code, "ADMIN");
 
     assert.equal(users.length, 1);
-    assert.equal(users[0]?.email, "bootstrap.admin@local");
+    assert.equal(users[0]?.email, "admin@coreman.com");
     assert.ok(users[0]?.roles.includes("ADMIN"));
     assert.ok(users[0]?.canLogin);
 
@@ -41,6 +42,7 @@ test("SQLite clean install bootstraps minimal required records", async () => {
 
     assert.deepEqual(smtpConfig, getRuntimeSmtpConfig());
   } finally {
+    adapter?.close?.();
     rmSync(tempDir, { recursive: true, force: true });
   }
 });

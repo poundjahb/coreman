@@ -101,6 +101,15 @@ export function createIpcHostAdapter(): IHostAdapter {
     postCaptureWorkflow: {
       execute: (command) => api.postCaptureWorkflow.execute(command)
     },
+    workflowPlugins: {
+      getCatalog: () => taskAssignmentsNotReady("workflowPlugins.getCatalog"),
+      listPlugins: () => taskAssignmentsNotReady("workflowPlugins.listPlugins"),
+      refresh: () => taskAssignmentsNotReady("workflowPlugins.refresh"),
+      setPluginEnabled: () => taskAssignmentsNotReady("workflowPlugins.setPluginEnabled"),
+      listBindings: () => taskAssignmentsNotReady("workflowPlugins.listBindings"),
+      saveBinding: () => taskAssignmentsNotReady("workflowPlugins.saveBinding"),
+      deleteBinding: () => taskAssignmentsNotReady("workflowPlugins.deleteBinding")
+    },
     sequenceStore: {
       next(_key: string): number {
         throw new Error(

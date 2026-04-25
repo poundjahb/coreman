@@ -12,6 +12,7 @@ import { registerUsersRoutes } from "./routes/users.js";
 import { registerActionDefinitionsRoutes } from "./routes/actionDefinitions.js";
 import { registerAssignmentsRoutes } from "./routes/assignments.js";
 import { registerOtherRoutes } from "./routes/other.js";
+import { registerWorkflowPluginRoutes } from "./routes/workflowPlugins.js";
 
 // Extend express-session with our custom property
 declare module "express-session" {
@@ -81,6 +82,7 @@ registerUsersRoutes(router, db);
 registerActionDefinitionsRoutes(router, db);
 registerAssignmentsRoutes(router, db);
 registerOtherRoutes(router, db);
+registerWorkflowPluginRoutes(router, db);
 
 // Mount router
 app.use(router);

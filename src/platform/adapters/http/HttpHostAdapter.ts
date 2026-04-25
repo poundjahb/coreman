@@ -14,6 +14,13 @@ import type {
 import type { NotificationPayload } from "../../contracts/INotificationService";
 import type { SendTestEmailCommand } from "../../contracts/ISmtpSettingsService";
 import type { EmailConfig, SendTestEmailCommand as SendTestEmailCommand2 } from "../../contracts/IEmailService";
+import type { SaveWorkflowBindingCommand } from "../../contracts/IWorkflowPluginService";
+import type {
+  WorkflowBindingRecord,
+  WorkflowCatalogSnapshot,
+  WorkflowPluginRecord,
+  WorkflowPluginRefreshResult
+} from "../../../domain/workflowPlugin";
 import { buildPlatformIndicator } from "../../platformIndicator";
 
 export const serverPlatformIndicator = buildPlatformIndicator({
@@ -116,6 +123,30 @@ function hydrateAuditEvent(raw: CorrespondenceAuditEvent): CorrespondenceAuditEv
   return {
     ...raw,
     createdAt: new Date(raw.createdAt)
+  };
+}
+
+function hydrateWorkflowPlugin(raw: WorkflowPluginRecord): WorkflowPluginRecord {
+  return {
+    ...raw,
+    discoveredAt: new Date(raw.discoveredAt),
+    updatedAt: new Date(raw.updatedAt)
+  };
+}
+
+function hydrateWorkflowBinding(raw: WorkflowBindingRecord): WorkflowBindingRecord {
+  return {
+    ...raw,
+    createdAt: new Date(raw.createdAt),
+    updatedAt: new Date(raw.updatedAt)
+  };
+}
+
+function hydrateWorkflowCatalog(raw: WorkflowCatalogSnapshot): WorkflowCatalogSnapshot {
+  return {
+    ...raw,
+    plugins: raw.plugins.map(hydrateWorkflowPlugin),
+    bindings: raw.bindings.map(hydrateWorkflowBinding)
   };
 }
 
@@ -325,6 +356,40 @@ export function createHttpHostAdapter(options: HttpHostAdapterOptions = {}): IHo
         );
         return payload.map(hydrateAuditEvent);
       }
+    },
+    workflowPlugins: {
+      async getCatalog(): Promise<WorkflowCatalogSnapshot> {
+        const payload = await requestJson<WorkflowCatalogSnapshot>(apiBaseUrl, "/api/workflow-catalog", "GET");
+        return hydrateWorkflowCatalog(payload);
+      },
+      async listPlugins(): Promise<WorkflowPluginRecord[]> {
+        const payload = await requestJson<WorkflowPluginRecord[]>(apiBaseUrl, "/api/workflow-plugins", "GET");
+        return payload.map(hydrateWorkflowPlugin);
+      },
+      refresh: (): Promise<WorkflowPluginRefreshResult> =>
+        requestJson<WorkflowPluginRefreshResult>(apiBaseUrl, "/api/workflow-plugins/refresh", "POST"),
+      setPluginEnabled: (pluginKey: string, isEnabled: boolean): Promise<void> =>
+        requestJson<void>(apiBaseUrl, `/api/workflow-plugins/${encodeURIComponent(pluginKey)}/enabled`, "PATCH", { isEnabled }),
+      async listBindings(): Promise<WorkflowBindingRecord[]> {
+        const payload = await requestJson<WorkflowBindingRecord[]>(apiBaseUrl, "/api/workflow-bindings", "GET");
+        return payload.map(hydrateWorkflowBinding);
+      },
+      async saveBinding(command: SaveWorkflowBindingCommand): Promise<WorkflowBindingRecord> {
+        if (command.id) {
+          const payload = await requestJson<WorkflowBindingRecord>(
+            apiBaseUrl,
+            `/api/workflow-bindings/${encodeURIComponent(command.id)}`,
+            "PATCH",
+            command
+          );
+          return hydrateWorkflowBinding(payload);
+        }
+
+        const payload = await requestJson<WorkflowBindingRecord>(apiBaseUrl, "/api/workflow-bindings", "POST", command);
+        return hydrateWorkflowBinding(payload);
+      },
+      deleteBinding: (id: string): Promise<void> =>
+        requestJson<void>(apiBaseUrl, `/api/workflow-bindings/${encodeURIComponent(id)}`, "DELETE")
     },
     postCaptureWorkflow: {
       execute: (command: ExecutePostCaptureWorkflowCommand): Promise<void> =>

@@ -2,6 +2,7 @@ import BetterSqlite3 from "better-sqlite3";
 import type { Database } from "better-sqlite3";
 import type { Branch, Department, AppUser } from "../../../domain/governance";
 import type { ReferenceFormatConfig } from "../../../domain/reference";
+import { getRuntimeSmtpConfig } from "../../../config/systemConfig";
 
 const bootstrapBranch: Branch = {
   id: "branch-bootstrap-main",
@@ -397,6 +398,26 @@ function seedDatabase(db: Database): void {
       branchId: null,
       departmentId: null,
       isActive: 1
+    });
+  }
+
+  if (!hasRows(db, "smtp_settings")) {
+    const smtpConfig = getRuntimeSmtpConfig();
+    const insertSmtpSettings = db.prepare(
+      `INSERT INTO smtp_settings
+        (id, host, port, secure, user, pass, fromAddress, connectionTimeoutMs, updatedAt)
+       VALUES
+        (1, @host, @port, @secure, @user, @pass, @fromAddress, @connectionTimeoutMs, @updatedAt)`
+    );
+    insertSmtpSettings.run({
+      host: smtpConfig.host,
+      port: smtpConfig.port,
+      secure: smtpConfig.secure ? 1 : 0,
+      user: smtpConfig.user ?? null,
+      pass: smtpConfig.pass ?? null,
+      fromAddress: smtpConfig.fromAddress,
+      connectionTimeoutMs: smtpConfig.connectionTimeoutMs,
+      updatedAt: new Date().toISOString()
     });
   }
 }

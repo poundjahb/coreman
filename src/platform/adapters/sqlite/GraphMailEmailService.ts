@@ -36,7 +36,6 @@ function rowToConfig(row: EmailSettingsRow): EmailConfig {
 
 export class GraphMailEmailService implements IEmailService {
   private readonly graphApiBase = "https://graph.microsoft.com/v1.0";
-  private readonly authEndpoint = "https://login.microsoftonline.com";
 
   constructor(private readonly db: Database) {}
 

@@ -12,6 +12,7 @@ import type { IEmailService } from "./contracts/IEmailService";
 import type { IUserRepository } from "./contracts/IUserRepository";
 import type { ICorrespondenceActionDefinitionRepository } from "./contracts/ICorrespondenceActionDefinitionRepository";
 import type { ICorrespondenceTaskAssignmentRepository } from "./contracts/ICorrespondenceTaskAssignmentRepository";
+import type { IWorkflowPluginService } from "./contracts/IWorkflowPluginService";
 
 export interface PlatformIndicator {
   target: PlatformTarget;
@@ -33,5 +34,6 @@ export interface IHostAdapter {
   notifications: INotificationService;
   correspondenceAuditLog: ICorrespondenceAuditLogRepository;
   postCaptureWorkflow: IPostCaptureWorkflowService;
+  workflowPlugins: IWorkflowPluginService;
   sequenceStore: SequenceStore;
 }

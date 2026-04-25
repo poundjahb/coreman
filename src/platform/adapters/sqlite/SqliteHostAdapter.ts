@@ -12,6 +12,8 @@ import { SqliteCorrespondenceAuditLogRepository } from "./SqliteCorrespondenceAu
 import { SqlitePostCaptureWorkflowService } from "./SqlitePostCaptureWorkflowService";
 import { SqliteSmtpSettingsService } from "./SqliteSmtpSettingsService";
 import { SqliteCorrespondenceActionDefinitionRepository } from "./SqliteCorrespondenceActionDefinitionRepository";
+import { SmtpEmailService } from "./SmtpEmailService";
+import { InMemoryWorkflowPluginService } from "../inMemory/InMemoryWorkflowPluginService";
 
 export const sqliteMainProcessPlatformIndicator = buildPlatformIndicator({
   target: "SQLITE",
@@ -27,12 +29,17 @@ export const sqliteMainProcessPlatformIndicator = buildPlatformIndicator({
 export function createSqliteHostAdapter(
   dbPath: string
 ): IHostAdapter {
+  function notReady(method: string): never {
+    throw new Error(`SqliteHostAdapter: call createSqliteHostAdapter(dbPath) — ${method} unavailable`);
+  }
+
   const db = openDatabase(dbPath);
   const smtpSettings = new SqliteSmtpSettingsService(db);
+  const emailSettings = new SmtpEmailService(db);
   const notifications = new SqliteNotificationService(db, smtpSettings);
   const correspondenceAuditLog = new SqliteCorrespondenceAuditLogRepository(db);
 
-  return {
+  const adapter: IHostAdapter = {
     platform: sqliteMainProcessPlatformIndicator,
     correspondences: new SqliteCorrespondenceRepository(db),
     users: new SqliteUserRepository(db),
@@ -48,11 +55,19 @@ export function createSqliteHostAdapter(
     },
     referenceConfigs: new SqliteReferenceConfigRepository(db),
     smtpSettings,
+    emailSettings,
     notifications,
     correspondenceAuditLog,
     postCaptureWorkflow: new SqlitePostCaptureWorkflowService(notifications, correspondenceAuditLog),
+    workflowPlugins: new InMemoryWorkflowPluginService(),
     sequenceStore: new SqliteSequenceStore(db)
   };
+
+  return Object.assign(adapter, {
+    close(): void {
+      db.close();
+    }
+  });
 }
 
 /**
@@ -111,12 +126,27 @@ export const sqliteHostAdapter: IHostAdapter = (() => {
       saveConfig: () => notReady("smtpSettings.saveConfig"),
       sendTestEmail: () => notReady("smtpSettings.sendTestEmail")
     },
+    emailSettings: {
+      getConfig: () => notReady("emailSettings.getConfig"),
+      saveConfig: () => notReady("emailSettings.saveConfig"),
+      sendTestEmail: () => notReady("emailSettings.sendTestEmail"),
+      sendEmail: () => notReady("emailSettings.sendEmail")
+    },
     notifications: { send: () => notReady("send") },
     correspondenceAuditLog: {
       append: () => notReady("append"),
       findByCorrespondence: () => notReady("findByCorrespondence")
     },
     postCaptureWorkflow: { execute: () => notReady("execute") },
+    workflowPlugins: {
+      getCatalog: () => notReady("workflowPlugins.getCatalog"),
+      listPlugins: () => notReady("workflowPlugins.listPlugins"),
+      refresh: () => notReady("workflowPlugins.refresh"),
+      setPluginEnabled: () => notReady("workflowPlugins.setPluginEnabled"),
+      listBindings: () => notReady("workflowPlugins.listBindings"),
+      saveBinding: () => notReady("workflowPlugins.saveBinding"),
+      deleteBinding: () => notReady("workflowPlugins.deleteBinding")
+    },
     sequenceStore: { next: () => notReady("next") }
   };
 })();
