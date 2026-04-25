@@ -107,7 +107,7 @@ const fallbackAdminUser: AppUser = {
   isActive: true,
   canLogin: true,
   canOwnActions: true,
-  roles: ["ADMIN", "RECEPTIONIST", "RECIPIENT", "ACTION_OWNER", "COPIED_VIEWER", "DASHBOARD_VIEWER"]
+  roles: ["ADMIN", "RECEPTIONIST", "RECIPIENT", "EXECUTIVE"]
 };
 
 interface RoleMenuItem {
@@ -180,7 +180,7 @@ function getRoleMenuSections(currentUser: AppUser): RoleMenuSection[] {
     });
   }
 
-  if (hasRole(currentUser, "DASHBOARD_VIEWER")) {
+  if (hasRole(currentUser, "EXECUTIVE")) {
     sections.push({
       title: "Executive",
       items: [
@@ -189,16 +189,16 @@ function getRoleMenuSections(currentUser: AppUser): RoleMenuSection[] {
     });
   }
 
-  if (hasRole(currentUser, "RECIPIENT") || hasRole(currentUser, "ACTION_OWNER")) {
+  if (hasRole(currentUser, "RECIPIENT")) {
     sections.push({
-      title: "Recipient / Action Owner",
+      title: "Recipient",
       items: [
         { label: "Action Dashboard", to: "/work/dashboard", icon: <ClipboardCheck size={16} /> }
       ]
     });
   }
 
-  if (!hasRole(currentUser, "RECEPTIONIST")) {
+  if (hasAnyRole(currentUser, ["ADMIN", "RECIPIENT", "EXECUTIVE"])) {
     sections.push({
       title: "Search",
       items: [
@@ -304,11 +304,11 @@ function getDefaultRoute(currentUser: AppUser, startupIssuesPresent: boolean): s
     return "/receptionist/dashboard";
   }
 
-  if (hasRole(currentUser, "RECIPIENT") || hasRole(currentUser, "ACTION_OWNER")) {
+  if (hasRole(currentUser, "RECIPIENT")) {
     return "/work/dashboard";
   }
 
-  if (hasRole(currentUser, "DASHBOARD_VIEWER")) {
+  if (hasRole(currentUser, "EXECUTIVE")) {
     return "/general-dashboard";
   }
 
@@ -620,7 +620,7 @@ export function App(): JSX.Element {
             path="/receptionist/history"
             element={
               <ProtectedRoute currentUser={currentUser} requiredRoles={["RECEPTIONIST", "ADMIN"]}>
-                <ReceptionistHistoryPage />
+                <ReceptionistHistoryPage currentUser={currentUser} />
               </ProtectedRoute>
             }
           />
@@ -628,7 +628,7 @@ export function App(): JSX.Element {
           <Route
             path="/work/dashboard"
             element={
-              <ProtectedRoute currentUser={currentUser} requiredRoles={["RECIPIENT", "ACTION_OWNER", "ADMIN"]}>
+              <ProtectedRoute currentUser={currentUser} requiredRoles={["RECIPIENT", "ADMIN"]}>
                 <WorkDashboardPage currentUser={currentUser} />
               </ProtectedRoute>
             }
@@ -636,7 +636,7 @@ export function App(): JSX.Element {
           <Route
             path="/tasks/assign"
             element={
-              <ProtectedRoute currentUser={currentUser} requiredRoles={["RECIPIENT", "ACTION_OWNER", "ADMIN"]}>
+              <ProtectedRoute currentUser={currentUser} requiredRoles={["RECIPIENT", "ADMIN"]}>
                 <TaskAssignationPage />
               </ProtectedRoute>
             }
@@ -644,7 +644,7 @@ export function App(): JSX.Element {
           <Route
             path="/tasks/action"
             element={
-              <ProtectedRoute currentUser={currentUser} requiredRoles={["RECIPIENT", "ACTION_OWNER", "ADMIN"]}>
+              <ProtectedRoute currentUser={currentUser} requiredRoles={["RECIPIENT", "ADMIN"]}>
                 <TakeActionPage />
               </ProtectedRoute>
             }
@@ -734,7 +734,7 @@ export function App(): JSX.Element {
           <Route
             path="/general-dashboard"
             element={
-              <ProtectedRoute currentUser={currentUser} requiredRoles={["DASHBOARD_VIEWER", "ADMIN"]}>
+              <ProtectedRoute currentUser={currentUser} requiredRoles={["EXECUTIVE", "ADMIN"]}>
                 <GeneralDashboardPage />
               </ProtectedRoute>
             }
@@ -744,9 +744,9 @@ export function App(): JSX.Element {
             element={
               <ProtectedRoute
                 currentUser={currentUser}
-                requiredRoles={["ADMIN", "RECIPIENT", "ACTION_OWNER", "COPIED_VIEWER", "DASHBOARD_VIEWER"]}
+                requiredRoles={["ADMIN", "RECIPIENT", "EXECUTIVE"]}
               >
-                <CorrespondenceSearchPage />
+                <CorrespondenceSearchPage currentUser={currentUser} />
               </ProtectedRoute>
             }
           />

@@ -51,12 +51,20 @@ export function WorkDashboardPage({ currentUser }: WorkDashboardPageProps): JSX.
       try {
         setError(null);
 
-        // Load all correspondences and filter to only those assigned to current user
-        const all = await runtimeHostAdapter.correspondences.findAll();
+        // Load all correspondences and task assignments for current user
+        const [all, taskAssignments] = await Promise.all([
+          runtimeHostAdapter.correspondences.findAll(),
+          runtimeHostAdapter.taskAssignments.findByAssignee(currentUser.id)
+        ]);
+
+        // Collect correspondence IDs assigned via task assignments
+        const taskCorrespondenceIds = new Set(taskAssignments.map((t) => t.correspondenceId));
+
         const assignedToCurrentUser = all.filter(
           (item) =>
             item.recipientId === currentUser.id
             || item.actionOwnerId === currentUser.id
+            || taskCorrespondenceIds.has(item.id)
         );
 
         if (!active) {
@@ -110,18 +118,22 @@ export function WorkDashboardPage({ currentUser }: WorkDashboardPageProps): JSX.
   }, [activeRecords]);
 
   const isRecipient = hasRole(currentUser, "RECIPIENT") || hasRole(currentUser, "ADMIN");
-  const isActionOwner = hasRole(currentUser, "ACTION_OWNER") || hasRole(currentUser, "ADMIN");
   const selectedCorrespondence = activeRecords.find((item) => item.id === selectedId) ?? null;
 
   const handleAssignmentCreated = async (): Promise<void> => {
     // Refresh the correspondence list after task assignment
     try {
       setError(null);
-      const all = await runtimeHostAdapter.correspondences.findAll();
+      const [all, taskAssignments] = await Promise.all([
+        runtimeHostAdapter.correspondences.findAll(),
+        runtimeHostAdapter.taskAssignments.findByAssignee(currentUser.id)
+      ]);
+      const taskCorrespondenceIds = new Set(taskAssignments.map((t) => t.correspondenceId));
       const assignedToCurrentUser = all.filter(
         (item) =>
           item.recipientId === currentUser.id
           || item.actionOwnerId === currentUser.id
+          || taskCorrespondenceIds.has(item.id)
       );
       setRecords(assignedToCurrentUser);
     } catch (refreshError) {
@@ -195,7 +207,7 @@ export function WorkDashboardPage({ currentUser }: WorkDashboardPageProps): JSX.
                               Assign Task
                             </Menu.Item>
                           )}
-                          {isActionOwner && (
+                          {isRecipient && (
                             <Menu.Item onClick={() => {
                               setTakeActionCorrespondenceId(row.id);
                               setTakeActionDrawerOpened(true);
@@ -203,7 +215,7 @@ export function WorkDashboardPage({ currentUser }: WorkDashboardPageProps): JSX.
                               Take Action
                             </Menu.Item>
                           )}
-                          {!isRecipient && !isActionOwner && <Menu.Item disabled>No available action for your role</Menu.Item>}
+                          {!isRecipient && <Menu.Item disabled>No available action for your role</Menu.Item>}
                         </Menu.Dropdown>
                       </Menu>
                     </Table.Td>

@@ -37,14 +37,14 @@ export const demoUsers: AppUser[] = [
     id: "u-002",
     userId: "owner@bank.local",
     employeeCode: "EMP-002",
-    fullName: "Action Owner",
+    fullName: "Recipient Owner",
     email: "owner@bank.local",
     branchId: "b-001",
     departmentId: "d-001",
     isActive: true,
     canLogin: true,
     canOwnActions: true,
-    roles: ["ACTION_OWNER"]
+    roles: ["RECIPIENT"]
   },
   {
     id: "u-003",
@@ -76,14 +76,14 @@ export const demoUsers: AppUser[] = [
     id: "u-005",
     userId: "executive@bank.local",
     employeeCode: "EMP-005",
-    fullName: "Executive Viewer",
+    fullName: "Executive User",
     email: "executive@bank.local",
     branchId: "b-001",
     departmentId: "d-002",
     isActive: true,
     canLogin: true,
     canOwnActions: false,
-    roles: ["DASHBOARD_VIEWER", "COPIED_VIEWER"]
+    roles: ["EXECUTIVE"]
   }
 ];
 

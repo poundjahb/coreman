@@ -92,9 +92,7 @@ function ensureDefaultAdminUser(db: Database.Database, passwordHash: string): vo
     "ADMIN",
     "RECEPTIONIST",
     "RECIPIENT",
-    "ACTION_OWNER",
-    "COPIED_VIEWER",
-    "DASHBOARD_VIEWER"
+    "EXECUTIVE"
   ];
   const insertRole = db.prepare("INSERT OR IGNORE INTO user_roles (userId, roleCode) VALUES (?, ?)");
   for (const roleCode of adminRoles) {

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Anchor, Card, Container, Group, Select, Stack, Table, Text, TextInput, Title } from "@mantine/core";
 import type { Correspondence } from "../../domain/correspondence";
 import type { AppUser, Branch, Department } from "../../domain/governance";
+import { hasRole } from "../../application/services/accessControl";
 import { runtimeHostAdapter } from "../../platform/runtimeHostAdapter";
 import { CorrespondenceDetailsDrawerContainer } from "../components/CorrespondenceDetailsDrawerContainer";
 
@@ -13,7 +14,8 @@ function toDateOnly(value: Date | undefined): string {
   return value.toISOString().slice(0, 10);
 }
 
-export function ReceptionistHistoryPage(): JSX.Element {
+export function ReceptionistHistoryPage(props: { currentUser: AppUser }): JSX.Element {
+  const { currentUser } = props;
   const [dateFrom, setDateFrom] = useState<string>("");
   const [dateTo, setDateTo] = useState<string>("");
   const [branch, setBranch] = useState<string | null>("all");
@@ -70,6 +72,7 @@ export function ReceptionistHistoryPage(): JSX.Element {
 
     return [...records]
       .sort((left, right) => right.receivedDate.getTime() - left.receivedDate.getTime())
+      .filter((item) => (hasRole(currentUser, "ADMIN") ? true : item.registeredById === currentUser.id))
       .filter((item) => {
         const received = toDateOnly(item.receivedDate);
         return dateFrom ? received >= dateFrom : true;
@@ -79,7 +82,7 @@ export function ReceptionistHistoryPage(): JSX.Element {
         return dateTo ? received <= dateTo : true;
       })
       .filter((item) => (branch === "all" ? true : item.branchId === branch))
-      .filter((item) => (receptionist === "all" ? true : item.registeredById === receptionist))
+      .filter((item) => (hasRole(currentUser, "ADMIN") && receptionist !== "all" ? item.registeredById === receptionist : true))
       .filter((item) => (direction === "all" ? true : item.direction === direction))
       .map((item) => ({
         ...item,
@@ -89,11 +92,20 @@ export function ReceptionistHistoryPage(): JSX.Element {
         recipientName: item.recipientId
           ? userById.get(item.recipientId)?.fullName ?? item.recipientId
           : "Unassigned",
-        departmentTargetName: item.departmentId && !item.recipientId
-          ? departmentById.get(item.departmentId)?.code ?? item.departmentId
-          : "-"
+        departmentTargetName: (() => {
+          if (!item.recipientId) {
+            return "-";
+          }
+
+          const recipientDepartmentId = userById.get(item.recipientId)?.departmentId;
+          if (!recipientDepartmentId) {
+            return "-";
+          }
+
+          return departmentById.get(recipientDepartmentId)?.code ?? recipientDepartmentId;
+        })()
       }));
-  }, [branches, dateFrom, dateTo, departments, direction, branch, records, receptionist, users]);
+  }, [branches, currentUser, dateFrom, dateTo, departments, direction, branch, records, receptionist, users]);
 
   const selectedCorrespondence = useMemo(
     () => rows.find((item) => item.id === selectedId) ?? null,
@@ -144,6 +156,7 @@ export function ReceptionistHistoryPage(): JSX.Element {
               label="Receptionist"
               value={receptionist}
               onChange={setReceptionist}
+              disabled={!hasRole(currentUser, "ADMIN")}
               data={[
                 { value: "all", label: "All Receptionists" },
                 ...users.map((item) => ({ value: item.id, label: item.fullName }))

@@ -102,7 +102,7 @@ export function ReceptionistDashboardPage(props: { currentUser: AppUser }): JSX.
 
     return [...records]
       .sort((left, right) => right.createdAt.getTime() - left.createdAt.getTime())
-      .filter((item) => item.registeredById === currentUser.id)
+      .filter((item) => (hasRole(currentUser, "ADMIN") ? true : item.registeredById === currentUser.id))
       .filter((item) => toDateOnly(item.createdAt) === today)
       .filter((item) => (direction === "all" ? true : item.direction === direction))
       .filter((item) => {
@@ -117,14 +117,23 @@ export function ReceptionistDashboardPage(props: { currentUser: AppUser }): JSX.
         departmentName: item.departmentId
           ? departmentById.get(item.departmentId)?.code ?? item.departmentId
           : "Unassigned",
-        departmentTargetName: item.departmentId && !item.recipientId
-          ? departmentById.get(item.departmentId)?.code ?? item.departmentId
-          : "-",
+        departmentTargetName: (() => {
+          if (!item.recipientId) {
+            return "-";
+          }
+
+          const recipientDepartmentId = userById.get(item.recipientId)?.departmentId;
+          if (!recipientDepartmentId) {
+            return "-";
+          }
+
+          return departmentById.get(recipientDepartmentId)?.code ?? recipientDepartmentId;
+        })(),
         recipientName: item.recipientId
           ? userById.get(item.recipientId)?.fullName ?? item.recipientId
           : "Unassigned"
       }));
-  }, [currentUser.id, departments, direction, query, records, users]);
+  }, [currentUser, departments, direction, query, records, users]);
 
   const selectedCorrespondence = useMemo(
     () => rows.find((item) => item.id === selectedId) ?? null,

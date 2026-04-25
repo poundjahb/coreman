@@ -31,7 +31,7 @@ export function TakeActionPage(props: TakeActionPageProps = {}): JSX.Element {
   const [selectedAssignmentId, setSelectedAssignmentId] = useState<string | null>(null);
   const [assignments, setAssignments] = useState<CorrespondenceTaskAssignment[]>([]);
   const [status, setStatus] = useState<string | null>(null);
-  const [deadline, setDeadline] = useState("");
+  const [deadline, setDeadline] = useState(() => new Date().toISOString().slice(0, 10));
   const [comment, setComment] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(true);
@@ -74,7 +74,7 @@ export function TakeActionPage(props: TakeActionPageProps = {}): JSX.Element {
           const firstAssignment = filtered[0];
           setSelectedAssignmentId(firstAssignment.id);
           setStatus(firstAssignment.status);
-          setDeadline(firstAssignment.deadline.toString());
+          setDeadline(firstAssignment.deadline instanceof Date ? firstAssignment.deadline.toISOString().slice(0, 10) : new Date(firstAssignment.deadline).toISOString().slice(0, 10));
           setComment(firstAssignment.description ?? "");
         } else {
           setError("No task assignments found for this correspondence");
@@ -109,7 +109,7 @@ export function TakeActionPage(props: TakeActionPageProps = {}): JSX.Element {
     if (selected) {
       setSelectedAssignmentId(assignmentId);
       setStatus(selected.status);
-      setDeadline(selected.deadline.toString());
+      setDeadline(selected.deadline instanceof Date ? selected.deadline.toISOString().slice(0, 10) : new Date(selected.deadline).toISOString().slice(0, 10));
       setComment(selected.description ?? "");
     }
   }

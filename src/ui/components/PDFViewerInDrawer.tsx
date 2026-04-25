@@ -20,6 +20,7 @@ const DEFAULT_SCALE = 1;
 const MIN_SCALE = 0.5;
 const MAX_SCALE = 2.5;
 const SCALE_STEP = 0.1;
+const PDF_DOCUMENT_OPTIONS = { withCredentials: true } as const;
 
 function clampScale(value: number): number {
   return Math.min(MAX_SCALE, Math.max(MIN_SCALE, Number(value.toFixed(2))));
@@ -78,7 +79,7 @@ export function PDFViewerInDrawer({ previewUrl, downloadUrl, fileName }: PDFView
         <Group justify="center">
           <Document
             file={previewUrl}
-            options={{ withCredentials: true }}
+            options={PDF_DOCUMENT_OPTIONS}
             onLoadSuccess={onDocumentLoadSuccess}
             loading={<Loader size="sm" />}
             error={<Text c="red" size="sm">Failed to load PDF. The file may be corrupted or inaccessible.</Text>}

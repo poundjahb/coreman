@@ -28,7 +28,7 @@ const bootstrapAdminUser: AppUser = {
   isActive: true,
   canLogin: true,
   canOwnActions: true,
-  roles: ["ADMIN", "RECEPTIONIST", "RECIPIENT", "ACTION_OWNER", "COPIED_VIEWER", "DASHBOARD_VIEWER"]
+  roles: ["ADMIN", "RECEPTIONIST", "RECIPIENT", "EXECUTIVE"]
 };
 
 const bootstrapReferenceConfig: ReferenceFormatConfig = {

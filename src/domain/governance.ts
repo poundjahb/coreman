@@ -4,17 +4,13 @@ export type RoleCode =
   | "ADMIN"
   | "RECEPTIONIST"
   | "RECIPIENT"
-  | "ACTION_OWNER"
-  | "COPIED_VIEWER"
-  | "DASHBOARD_VIEWER";
+  | "EXECUTIVE";
 
 export const ALL_ROLE_CODES: RoleCode[] = [
   "ADMIN",
   "RECEPTIONIST",
   "RECIPIENT",
-  "ACTION_OWNER",
-  "COPIED_VIEWER",
-  "DASHBOARD_VIEWER"
+  "EXECUTIVE"
 ];
 
 export interface Branch {
