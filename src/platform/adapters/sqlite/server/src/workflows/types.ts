@@ -94,9 +94,14 @@ export interface WorkflowExecutionContext {
     };
     correspondences: {
       find: (id: string) => Record<string, unknown> | null;
+      updateSummary: (id: string, summary: string) => void;
+    };
+    users: {
+      find: (id: string) => Record<string, unknown> | null;
     };
     actionDefinitions: {
       find: (id: string) => Record<string, unknown> | null;
+      listActive: () => Array<Record<string, unknown>>;
     };
     config: {
       get: (key: string) => string | undefined;

@@ -149,6 +149,7 @@ export function initializeDatabase(): Database.Database {
       id TEXT PRIMARY KEY,
       referenceNumber TEXT NOT NULL UNIQUE,
       senderReference TEXT,
+      summary TEXT,
       fromTo TEXT NOT NULL DEFAULT '',
       organisation TEXT,
       branchId TEXT NOT NULL,
@@ -307,6 +308,11 @@ export function initializeDatabase(): Database.Database {
   const hasSenderReference = correspondenceColumns.some((column) => column.name === "senderReference");
   if (!hasSenderReference) {
     db.exec("ALTER TABLE correspondences ADD COLUMN senderReference TEXT");
+  }
+
+  const hasSummary = correspondenceColumns.some((column) => column.name === "summary");
+  if (!hasSummary) {
+    db.exec("ALTER TABLE correspondences ADD COLUMN summary TEXT");
   }
 
   const hasRecipientId = correspondenceColumns.some((column) => column.name === "recipientId");

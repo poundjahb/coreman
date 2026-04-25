@@ -114,10 +114,23 @@ export async function executeWorkflowTrigger(
           }
         },
         correspondences: {
-          find: (id: string) => getRow(db, "SELECT * FROM correspondences WHERE id = ?", id)
+          find: (id: string) => getRow(db, "SELECT * FROM correspondences WHERE id = ?", id),
+          updateSummary: (id: string, summary: string) => {
+            db.prepare(
+              `UPDATE correspondences
+               SET summary = ?, updatedAt = ?, updateBy = ?
+               WHERE id = ?`
+            ).run(summary, new Date().toISOString(), request.actorId, id);
+          }
+        },
+        users: {
+          find: (id: string) => getRow(db, "SELECT * FROM users WHERE id = ?", id)
         },
         actionDefinitions: {
-          find: (id: string) => getRow(db, "SELECT * FROM action_definitions WHERE id = ?", id)
+          find: (id: string) => getRow(db, "SELECT * FROM action_definitions WHERE id = ?", id),
+          listActive: () =>
+            db.prepare("SELECT * FROM action_definitions WHERE isActive = 1 ORDER BY label COLLATE NOCASE ASC, code ASC")
+              .all() as Array<Record<string, unknown>>
         },
         config: {
           get: (key: string) => process.env[key]

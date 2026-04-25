@@ -1,0 +1,13 @@
+{
+  "pluginKey": "analyse-correspondence",
+  "name": "Analyse Correspondence",
+  "description": "Posts the correspondence attachment file to an external analysis HTTP service.",
+  "version": "1.0.0",
+  "apiVersion": "1.0",
+  "platformTarget": "SERVER",
+  "supportedTriggers": [
+    "CORRESPONDENCE_CREATED"
+  ],
+  "entryFile": "index.mjs",
+  "enabledByDefault": true
+}
