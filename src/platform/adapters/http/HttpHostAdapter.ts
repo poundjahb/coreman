@@ -113,6 +113,7 @@ async function requestJson<TResponse>(
     headers: {
       "Content-Type": "application/json"
     },
+    credentials: "include",
     body: body === undefined ? undefined : JSON.stringify(body)
   });
 
@@ -137,6 +138,7 @@ async function requestFormData<TResponse>(
 ): Promise<TResponse> {
   const response = await fetch(`${baseUrl}${path}${serializeQuery(query)}`, {
     method,
+    credentials: "include",
     body
   });
 

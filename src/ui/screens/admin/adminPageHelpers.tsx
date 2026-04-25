@@ -41,6 +41,7 @@ export interface EditorState {
 
 export interface UserEditorState {
   id: string | null;
+  userId: string;
   employeeCode: string;
   fullName: string;
   email: string;
@@ -88,6 +89,7 @@ export const emptyEditorState: EditorState = {
 
 export const emptyUserEditorState: UserEditorState = {
   id: null,
+  userId: "",
   employeeCode: "",
   fullName: "",
   email: "",
@@ -167,6 +169,7 @@ export function beginEditEntity(item: Branch | Department): EditorState {
 export function beginEditUser(user: AppUser): UserEditorState {
   return {
     id: user.id,
+    userId: user.userId,
     employeeCode: user.employeeCode,
     fullName: user.fullName,
     email: user.email,

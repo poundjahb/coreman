@@ -22,6 +22,7 @@ export const demoBranchDepartments: BranchDepartment[] = [
 export const demoUsers: AppUser[] = [
   {
     id: "u-001",
+    userId: "reception@bank.local",
     employeeCode: "EMP-001",
     fullName: "Reception User",
     email: "reception@bank.local",
@@ -34,6 +35,7 @@ export const demoUsers: AppUser[] = [
   },
   {
     id: "u-002",
+    userId: "owner@bank.local",
     employeeCode: "EMP-002",
     fullName: "Action Owner",
     email: "owner@bank.local",
@@ -46,6 +48,7 @@ export const demoUsers: AppUser[] = [
   },
   {
     id: "u-003",
+    userId: "recipient@bank.local",
     employeeCode: "EMP-003",
     fullName: "Recipient User",
     email: "recipient@bank.local",
@@ -58,6 +61,7 @@ export const demoUsers: AppUser[] = [
   },
   {
     id: "u-004",
+    userId: "superadmin@bank.local",
     employeeCode: "EMP-000",
     fullName: "Default Super Admin",
     email: "superadmin@bank.local",
@@ -70,6 +74,7 @@ export const demoUsers: AppUser[] = [
   },
   {
     id: "u-005",
+    userId: "executive@bank.local",
     employeeCode: "EMP-005",
     fullName: "Executive Viewer",
     email: "executive@bank.local",

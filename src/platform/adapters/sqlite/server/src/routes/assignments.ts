@@ -511,6 +511,26 @@ export function registerAssignmentsRoutes(router: Router, db: Database.Database)
         updatedBy
       );
 
+      // Update correspondence status to ASSIGNED and dueDate to the latest deadline across all tasks.
+      const prevCorrespondence = db
+        .prepare("SELECT status FROM correspondences WHERE id = ?")
+        .get(correspondenceId) as { status: string } | undefined;
+      const latestDeadlineRow = db
+        .prepare("SELECT MAX(deadline) as latestDeadline FROM correspondence_task_assignments WHERE correspondenceId = ?")
+        .get(correspondenceId) as { latestDeadline: string | null };
+      const latestDeadline = latestDeadlineRow?.latestDeadline ?? deadline;
+      db.prepare("UPDATE correspondences SET status = 'ASSIGNED', dueDate = ?, updatedAt = ? WHERE id = ?")
+        .run(latestDeadline, new Date().toISOString(), correspondenceId);
+      appendAuditEvent(db, correspondenceId, "CORRESPONDENCE_STATUS_CHANGED", createdBy, {
+        actionName: "CORRESPONDENCE_STATUS_CHANGED",
+        actionSource: resolveActionSource(createdBy),
+        previousStatus: prevCorrespondence?.status ?? null,
+        newStatus: "ASSIGNED",
+        trigger: "ASSIGNMENT_CREATED",
+        assignmentId: id,
+        dueDate: latestDeadline
+      });
+
       appendAuditEvent(db, correspondenceId, "CORRESPONDENCE_ASSIGNED", createdBy, {
         actionName: "CORRESPONDENCE_ASSIGNED",
         actionSource: resolveActionSource(createdBy),

@@ -5,6 +5,7 @@ export type CorrespondenceDirection = "INCOMING" | "OUTGOING";
 export type CorrespondenceStatus =
   | "NEW"
   | "IN_PROGRESS"
+  | "ASSIGNED"
   | "AWAITING_REVIEW"
   | "CLOSED";
 

@@ -2,10 +2,105 @@ import Database from "better-sqlite3";
 import path from "path";
 import { fileURLToPath } from "url";
 import fs from "fs";
+import bcrypt from "bcryptjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const dataDir = path.join(__dirname, "..", "data");
 const dbPath = path.join(dataDir, "coreman.db");
+const defaultAdminUserId = "admin@coreman.com";
+const defaultAdminRecordId = "user-coreman-admin";
+
+function toUniqueUserId(candidate: string, used: Set<string>): string {
+  const normalized = candidate.trim().toLowerCase();
+  const [localRaw, domainRaw] = normalized.includes("@")
+    ? normalized.split("@", 2)
+    : [normalized, "coreman.com"];
+
+  const local = localRaw.length > 0 ? localRaw : "user";
+  const domain = domainRaw.length > 0 ? domainRaw : "coreman.com";
+
+  let attempt = `${local}@${domain}`;
+  let suffix = 1;
+  while (used.has(attempt)) {
+    attempt = `${local}+${suffix}@${domain}`;
+    suffix += 1;
+  }
+  used.add(attempt);
+  return attempt;
+}
+
+function ensureDefaultAdminUser(db: Database.Database, passwordHash: string): void {
+  const existingAdmin = db
+    .prepare(
+      `SELECT u.id
+       FROM users u
+       INNER JOIN user_roles ur ON ur.userId = u.id
+       WHERE ur.roleCode = 'ADMIN'
+       LIMIT 1`
+    )
+    .get() as { id: string } | undefined;
+
+  if (existingAdmin) {
+    return;
+  }
+
+  const branch = db
+    .prepare("SELECT id FROM branches ORDER BY isActive DESC, code ASC LIMIT 1")
+    .get() as { id: string } | undefined;
+  let branchId = branch?.id;
+  if (!branchId) {
+    branchId = "branch-coreman-main";
+    db.prepare("INSERT INTO branches (id, code, name, isActive) VALUES (?, ?, ?, 1)")
+      .run(branchId, "CORE-HQ", "Coreman Headquarters");
+  }
+
+  const department = db
+    .prepare("SELECT id FROM departments ORDER BY isActive DESC, code ASC LIMIT 1")
+    .get() as { id: string } | undefined;
+  let departmentId = department?.id;
+  if (!departmentId) {
+    departmentId = "department-coreman-admin";
+    db.prepare("INSERT INTO departments (id, code, name, isActive) VALUES (?, ?, ?, 1)")
+      .run(departmentId, "CORE-ADMIN", "Coreman Administration");
+  }
+
+  const existingDefaultUser = db
+    .prepare("SELECT id FROM users WHERE LOWER(userId) = LOWER(?)")
+    .get(defaultAdminUserId) as { id: string } | undefined;
+
+  const adminId = existingDefaultUser?.id ?? defaultAdminRecordId;
+  if (!existingDefaultUser) {
+    db.prepare(
+      `INSERT INTO users (id, userId, employeeCode, fullName, email, branchId, departmentId, isActive, canLogin, canOwnActions, passwordHash)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 1, 1, 1, ?)`
+    ).run(
+      adminId,
+      defaultAdminUserId,
+      "ADM-001",
+      "Coreman Administrator",
+      defaultAdminUserId,
+      branchId,
+      departmentId,
+      passwordHash
+    );
+  } else {
+    db.prepare("UPDATE users SET isActive = 1, canLogin = 1, passwordHash = ? WHERE id = ?")
+      .run(passwordHash, adminId);
+  }
+
+  const adminRoles: string[] = [
+    "ADMIN",
+    "RECEPTIONIST",
+    "RECIPIENT",
+    "ACTION_OWNER",
+    "COPIED_VIEWER",
+    "DASHBOARD_VIEWER"
+  ];
+  const insertRole = db.prepare("INSERT OR IGNORE INTO user_roles (userId, roleCode) VALUES (?, ?)");
+  for (const roleCode of adminRoles) {
+    insertRole.run(adminId, roleCode);
+  }
+}
 
 // Create data directory if it doesn't exist
 if (!fs.existsSync(dataDir)) {
@@ -35,6 +130,7 @@ export function initializeDatabase(): Database.Database {
 
     CREATE TABLE IF NOT EXISTS users (
       id TEXT PRIMARY KEY,
+      userId TEXT NOT NULL UNIQUE,
       employeeCode TEXT NOT NULL UNIQUE,
       fullName TEXT NOT NULL,
       email TEXT NOT NULL,
@@ -242,6 +338,66 @@ export function initializeDatabase(): Database.Database {
 
   db.exec("UPDATE correspondence_audit_log SET createdById = createdBy WHERE createdById IS NULL");
   db.exec("UPDATE correspondence_audit_log SET payloadJson = details WHERE payloadJson IS NULL AND details IS NOT NULL");
+
+  // --- Auth: passwordHash migration ---
+  const userColumns = db.prepare("PRAGMA table_info(users)").all() as Array<{ name: string }>;
+  const hasUserId = userColumns.some((col) => col.name === "userId");
+  if (!hasUserId) {
+    db.exec("ALTER TABLE users ADD COLUMN userId TEXT");
+  }
+
+  const usersForUserIdBackfill = db
+    .prepare("SELECT id, userId, email FROM users ORDER BY id")
+    .all() as Array<{ id: string; userId: string | null; email: string | null }>;
+  const usedUserIds = new Set<string>();
+  const updateUserIdStmt = db.prepare("UPDATE users SET userId = ? WHERE id = ?");
+  for (const user of usersForUserIdBackfill) {
+    const candidate = user.userId ?? user.email ?? `${user.id}@coreman.com`;
+    const uniqueUserId = toUniqueUserId(candidate, usedUserIds);
+    updateUserIdStmt.run(uniqueUserId, user.id);
+  }
+  db.exec("CREATE UNIQUE INDEX IF NOT EXISTS users_userId_idx ON users (userId)");
+
+  const hasPasswordHash = userColumns.some((col) => col.name === "passwordHash");
+  if (!hasPasswordHash) {
+    db.exec("ALTER TABLE users ADD COLUMN passwordHash TEXT");
+  }
+
+  // Seed default password for users that have no hash yet.
+  const defaultPassword = process.env.COREMAN_DEFAULT_PASSWORD ?? "coreman";
+  const defaultHash = bcrypt.hashSync(defaultPassword, 10);
+  db.prepare("UPDATE users SET passwordHash = ? WHERE passwordHash IS NULL").run(defaultHash);
+  ensureDefaultAdminUser(db, defaultHash);
+
+  // --- Session store table (connect-sqlite3 compatible) ---
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS sessions (
+      sid TEXT PRIMARY KEY NOT NULL,
+      expired INTEGER NOT NULL,
+      sess TEXT NOT NULL
+    );
+  `);
+
+  const sessionColumns = db.prepare("PRAGMA table_info(sessions)").all() as Array<{ cid: number; name: string; type: string }>;
+  const hasExpectedSessionSchema =
+    sessionColumns.length === 3
+    && sessionColumns[0]?.name === "sid"
+    && sessionColumns[1]?.name === "expired"
+    && sessionColumns[2]?.name === "sess";
+
+  if (!hasExpectedSessionSchema) {
+    // Existing data is session cache only; recreate to guarantee store compatibility.
+    db.exec(`
+      DROP TABLE IF EXISTS sessions;
+      CREATE TABLE sessions (
+        sid TEXT PRIMARY KEY NOT NULL,
+        expired INTEGER NOT NULL,
+        sess TEXT NOT NULL
+      );
+    `);
+  }
+
+  db.exec("CREATE INDEX IF NOT EXISTS sessions_expired_idx ON sessions (expired)");
 
   return db;
 }

@@ -19,9 +19,10 @@ const bootstrapDepartment: Department = {
 
 const bootstrapAdminUser: AppUser = {
   id: "user-bootstrap-admin",
+  userId: "admin@coreman.com",
   employeeCode: "BOOT-001",
   fullName: "Bootstrap Administrator",
-  email: "bootstrap.admin@local",
+  email: "admin@coreman.com",
   branchId: bootstrapBranch.id,
   departmentId: bootstrapDepartment.id,
   isActive: true,
@@ -75,6 +76,7 @@ function initSchema(db: Database): void {
 
     CREATE TABLE IF NOT EXISTS users (
       id              TEXT PRIMARY KEY,
+      userId          TEXT NOT NULL UNIQUE,
       employeeCode    TEXT NOT NULL,
       fullName        TEXT NOT NULL,
       email           TEXT NOT NULL,
@@ -172,7 +174,42 @@ function initSchema(db: Database): void {
   `);
 
   ensureCorrespondenceColumns(db);
+  ensureUserColumns(db);
   ensureCorrespondenceUserReferenceTriggers(db);
+}
+
+function ensureUserColumns(db: Database): void {
+  const columns = db.prepare("PRAGMA table_info(users)").all() as Array<{ name: string }>;
+  const existing = new Set(columns.map((column) => column.name));
+
+  if (!existing.has("userId")) {
+    db.exec("ALTER TABLE users ADD COLUMN userId TEXT");
+  }
+
+  const rows = db.prepare("SELECT id, userId, email FROM users ORDER BY id").all() as Array<{
+    id: string;
+    userId?: string | null;
+    email?: string | null;
+  }>;
+  const used = new Set<string>();
+  const updateStmt = db.prepare("UPDATE users SET userId = ? WHERE id = ?");
+
+  for (const row of rows) {
+    const raw = (row.userId ?? row.email ?? `${row.id}@coreman.com`).trim().toLowerCase();
+    const [localRaw, domainRaw] = raw.includes("@") ? raw.split("@", 2) : [raw, "coreman.com"];
+    const local = localRaw.length > 0 ? localRaw : "user";
+    const domain = domainRaw.length > 0 ? domainRaw : "coreman.com";
+    let next = `${local}@${domain}`;
+    let counter = 1;
+    while (used.has(next)) {
+      next = `${local}+${counter}@${domain}`;
+      counter += 1;
+    }
+    used.add(next);
+    updateStmt.run(next, row.id);
+  }
+
+  db.exec("CREATE UNIQUE INDEX IF NOT EXISTS users_userId_idx ON users (userId)");
 }
 
 function ensureCorrespondenceColumns(db: Database): void {
@@ -335,9 +372,9 @@ function seedDatabase(db: Database): void {
   if (!hasRows(db, "users")) {
     const insertUser = db.prepare(
       `INSERT INTO users
-        (id, employeeCode, fullName, email, branchId, departmentId, isActive, canLogin, canOwnActions, roles)
+        (id, userId, employeeCode, fullName, email, branchId, departmentId, isActive, canLogin, canOwnActions, roles)
        VALUES
-        (@id, @employeeCode, @fullName, @email, @branchId, @departmentId, @isActive, @canLogin, @canOwnActions, @roles)`
+        (@id, @userId, @employeeCode, @fullName, @email, @branchId, @departmentId, @isActive, @canLogin, @canOwnActions, @roles)`
     );
     insertUser.run({
       ...bootstrapAdminUser,

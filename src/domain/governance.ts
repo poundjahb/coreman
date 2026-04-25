@@ -40,6 +40,7 @@ export interface BranchDepartment {
 
 export interface AppUser {
   id: string;
+  userId: string;
   employeeCode: string;
   fullName: string;
   email: string;

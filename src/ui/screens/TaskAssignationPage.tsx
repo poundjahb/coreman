@@ -159,6 +159,39 @@ export function TaskAssignationPage(props: TaskAssignationPageProps): JSX.Elemen
 
         // SERVER mode route already appends audit; handle other adapters here.
         if (runtimePlatformTarget !== "SERVER") {
+          // Update correspondence status to ASSIGNED and dueDate to the latest deadline across all tasks.
+          try {
+            const allAssignments = await runtimeHostAdapter.taskAssignments.findByCorrespondence(selectedCorrespondenceId);
+            const latestDeadline = allAssignments.reduce<Date | null>((max, a) => {
+              if (!a.deadline) return max;
+              const d = a.deadline instanceof Date ? a.deadline : new Date(a.deadline);
+              return max === null || d > max ? d : max;
+            }, null) ?? new Date(`${deadline}T00:00:00.000Z`);
+            await runtimeHostAdapter.correspondences.update(selectedCorrespondenceId, {
+              status: "ASSIGNED",
+              dueDate: latestDeadline
+            });
+          } catch {
+            // Non-fatal — status update failure does not roll back the assignment.
+          }
+
+          try {
+            await runtimeHostAdapter.correspondenceAuditLog.append({
+              correspondenceId: selectedCorrespondenceId,
+              eventType: "CORRESPONDENCE_STATUS_CHANGED",
+              status: "SUCCESS",
+              payloadJson: JSON.stringify({
+                actionName: "CORRESPONDENCE_STATUS_CHANGED",
+                actionSource: "USER",
+                newStatus: "ASSIGNED",
+                trigger: "ASSIGNMENT_CREATED"
+              }),
+              createdById: effectiveCurrentUser.id
+            });
+          } catch {
+            // Non-fatal.
+          }
+
           try {
             await runtimeHostAdapter.correspondenceAuditLog.append({
               correspondenceId: selectedCorrespondenceId,

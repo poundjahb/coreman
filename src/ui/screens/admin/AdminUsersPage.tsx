@@ -9,6 +9,7 @@ import {
   Group,
   Loader,
   MultiSelect,
+  PasswordInput,
   Select,
   SimpleGrid,
   Stack,
@@ -43,6 +44,7 @@ export function AdminUsersPage(props: { onUsersChanged?: () => Promise<void> | v
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [editor, setEditor] = useState<UserEditorState>(emptyUserEditorState);
+  const [newPassword, setNewPassword] = useState("");
 
   const branchOptions = useMemo(
     () => branches.map((branch) => ({ value: branch.id, label: `${branch.code} — ${branch.name}` })),
@@ -102,8 +104,8 @@ export function AdminUsersPage(props: { onUsersChanged?: () => Promise<void> | v
   }, [allowedDepartments, editor.branchId, editor.departmentId]);
 
   async function handleSave(): Promise<void> {
-    if (!editor.employeeCode.trim() || !editor.fullName.trim() || !editor.email.trim()) {
-      setError("Employee code, full name, and email are required.");
+    if (!editor.userId.trim() || !editor.employeeCode.trim() || !editor.fullName.trim() || !editor.email.trim()) {
+      setError("User ID, employee code, full name, and email are required.");
       return;
     }
 
@@ -124,8 +126,10 @@ export function AdminUsersPage(props: { onUsersChanged?: () => Promise<void> | v
 
     try {
       setError(null);
+      const savedUserId = editor.id ?? crypto.randomUUID();
       await runtimeHostAdapter.users.save({
-        id: editor.id ?? crypto.randomUUID(),
+        id: savedUserId,
+        userId: editor.userId.trim(),
         employeeCode: editor.employeeCode.trim(),
         fullName: editor.fullName.trim(),
         email: editor.email.trim(),
@@ -137,7 +141,26 @@ export function AdminUsersPage(props: { onUsersChanged?: () => Promise<void> | v
         roles: editor.roles
       });
 
+      if (newPassword.trim().length >= 6) {
+        const env = (import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env;
+        const apiBase = (env?.VITE_API_BASE_URL ?? "http://localhost:3001").replace(/\/$/, "");
+        const pwRes = await fetch(`${apiBase}/api/auth/set-password`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ userId: savedUserId, newPassword: newPassword.trim() })
+        });
+
+        if (!pwRes.ok) {
+          const payload = await pwRes.json() as { error?: string };
+          setError(payload.error ?? "User saved but password update failed.");
+          await loadUsersPage();
+          return;
+        }
+      }
+
       setEditor(emptyUserEditorState);
+      setNewPassword("");
       await loadUsersPage();
       await onUsersChanged?.();
     } catch (saveError) {
@@ -187,6 +210,7 @@ export function AdminUsersPage(props: { onUsersChanged?: () => Promise<void> | v
           <Stack gap="md">
             <Title order={4}>{editor.id ? "Edit User" : "Create User"}</Title>
             <Group grow>
+              <TextInput label="User ID" placeholder="admin@coreman.com" value={editor.userId} onChange={(event) => setEditor((current) => ({ ...current, userId: event.currentTarget.value }))} />
               <TextInput label="Employee Code" value={editor.employeeCode} onChange={(event) => setEditor((current) => ({ ...current, employeeCode: event.currentTarget.value }))} />
               <TextInput label="Full Name" value={editor.fullName} onChange={(event) => setEditor((current) => ({ ...current, fullName: event.currentTarget.value }))} />
             </Group>
@@ -206,8 +230,16 @@ export function AdminUsersPage(props: { onUsersChanged?: () => Promise<void> | v
               <Checkbox label="Can Login" checked={editor.canLogin} onChange={(event) => setEditor((current) => ({ ...current, canLogin: event.currentTarget.checked }))} />
               <Checkbox label="Can Own Actions" checked={editor.canOwnActions} onChange={(event) => setEditor((current) => ({ ...current, canOwnActions: event.currentTarget.checked }))} />
             </Group>
+            <PasswordInput
+              label="Set Password"
+              description="Leave empty to keep the current password. Minimum 6 characters."
+              placeholder="New password (optional)"
+              value={newPassword}
+              onChange={(event) => setNewPassword(event.currentTarget.value)}
+              autoComplete="new-password"
+            />
             <Group justify="flex-end">
-              <Button variant="default" onClick={() => setEditor(emptyUserEditorState)}>Clear</Button>
+              <Button variant="default" onClick={() => { setEditor(emptyUserEditorState); setNewPassword(""); }}>Clear</Button>
               <Button onClick={() => void handleSave()}>{saveLabel(editor.id, "User")}</Button>
             </Group>
           </Stack>
@@ -223,6 +255,7 @@ export function AdminUsersPage(props: { onUsersChanged?: () => Promise<void> | v
               <Table striped highlightOnHover>
                 <Table.Thead>
                   <Table.Tr>
+                    <Table.Th>User ID</Table.Th>
                     <Table.Th>Employee Code</Table.Th>
                     <Table.Th>Name</Table.Th>
                     <Table.Th>Email</Table.Th>
@@ -234,6 +267,7 @@ export function AdminUsersPage(props: { onUsersChanged?: () => Promise<void> | v
                 <Table.Tbody>
                   {users.map((user) => (
                     <Table.Tr key={user.id}>
+                      <Table.Td>{user.userId}</Table.Td>
                       <Table.Td>{user.employeeCode}</Table.Td>
                       <Table.Td>{user.fullName}</Table.Td>
                       <Table.Td>{user.email}</Table.Td>

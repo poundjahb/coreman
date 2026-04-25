@@ -18,6 +18,7 @@ type CorrespondenceRow = Omit<
 
 type UserRow = {
   id: string;
+  userId: string;
   employeeCode: string;
   fullName: string;
   email: string;
@@ -32,6 +33,7 @@ type UserRow = {
 function parseUser(row: UserRow): AppUser {
   return {
     id: row.id,
+    userId: row.userId,
     employeeCode: row.employeeCode,
     fullName: row.fullName,
     email: row.email,

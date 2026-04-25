@@ -33,9 +33,9 @@ export class SqliteUserRepository implements IUserRepository {
   async save(user: AppUser): Promise<void> {
     this.db.prepare(
       `INSERT OR REPLACE INTO users
-        (id, employeeCode, fullName, email, branchId, departmentId, isActive, canLogin, canOwnActions, roles)
+        (id, userId, employeeCode, fullName, email, branchId, departmentId, isActive, canLogin, canOwnActions, roles)
        VALUES
-        (@id, @employeeCode, @fullName, @email, @branchId, @departmentId, @isActive, @canLogin, @canOwnActions, @roles)`
+        (@id, @userId, @employeeCode, @fullName, @email, @branchId, @departmentId, @isActive, @canLogin, @canOwnActions, @roles)`
     ).run({
       ...user,
       isActive: user.isActive ? 1 : 0,

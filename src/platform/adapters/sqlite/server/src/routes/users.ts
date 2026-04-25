@@ -3,6 +3,7 @@ import type Database from "better-sqlite3";
 
 export interface AppUser {
   id: string;
+  userId: string;
   employeeCode: string;
   fullName: string;
   email: string;
@@ -16,6 +17,7 @@ export interface AppUser {
 
 interface DbUserRow {
   id: string;
+  userId: string;
   employeeCode: string;
   fullName: string;
   email: string;
@@ -32,7 +34,7 @@ export function registerUsersRoutes(router: Router, db: Database.Database): void
     try {
       const users = db
         .prepare(
-          `SELECT id, employeeCode, fullName, email, branchId, departmentId, isActive, canLogin, canOwnActions
+          `SELECT id, userId, employeeCode, fullName, email, branchId, departmentId, isActive, canLogin, canOwnActions
            FROM users ORDER BY fullName`
         )
         .all() as DbUserRow[];
@@ -64,7 +66,7 @@ export function registerUsersRoutes(router: Router, db: Database.Database): void
       const { id } = req.params;
       const user = db
         .prepare(
-          `SELECT id, employeeCode, fullName, email, branchId, departmentId, isActive, canLogin, canOwnActions
+          `SELECT id, userId, employeeCode, fullName, email, branchId, departmentId, isActive, canLogin, canOwnActions
            FROM users WHERE id = ?`
         )
         .get(id) as DbUserRow | undefined;
@@ -104,7 +106,7 @@ export function registerUsersRoutes(router: Router, db: Database.Database): void
 
       const users = db
         .prepare(
-          `SELECT id, employeeCode, fullName, email, branchId, departmentId, isActive, canLogin, canOwnActions
+          `SELECT id, userId, employeeCode, fullName, email, branchId, departmentId, isActive, canLogin, canOwnActions
            FROM users WHERE branchId = ? ORDER BY fullName`
         )
         .all(branchId) as DbUserRow[];
@@ -133,20 +135,20 @@ export function registerUsersRoutes(router: Router, db: Database.Database): void
   // POST /api/users
   router.post("/api/users", (req: Request, res: Response) => {
     try {
-      const { id, employeeCode, fullName, email, branchId, departmentId, isActive, canLogin, canOwnActions, roles } =
+      const { id, userId, employeeCode, fullName, email, branchId, departmentId, isActive, canLogin, canOwnActions, roles } =
         req.body as AppUser;
 
-      if (!id || !employeeCode || !fullName || !email || !branchId || !departmentId) {
+      if (!id || !userId || !employeeCode || !fullName || !email || !branchId || !departmentId) {
         res.status(400).json({ error: "Missing required fields" });
         return;
       }
 
       const stmt = db.prepare(
-        `INSERT OR REPLACE INTO users (id, employeeCode, fullName, email, branchId, departmentId, isActive, canLogin, canOwnActions)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        `INSERT OR REPLACE INTO users (id, userId, employeeCode, fullName, email, branchId, departmentId, isActive, canLogin, canOwnActions)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       );
 
-      stmt.run(id, employeeCode, fullName, email, branchId, departmentId, isActive ? 1 : 0, canLogin ? 1 : 0, canOwnActions ? 1 : 0);
+      stmt.run(id, userId.trim(), employeeCode, fullName, email, branchId, departmentId, isActive ? 1 : 0, canLogin ? 1 : 0, canOwnActions ? 1 : 0);
 
       // Handle roles
       db.prepare("DELETE FROM user_roles WHERE userId = ?").run(id);

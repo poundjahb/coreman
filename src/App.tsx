@@ -1,10 +1,11 @@
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import {
   Alert,
   AppShell,
   Avatar,
   Box,
   Burger,
+  Button,
   Divider,
   Group,
   Menu,
@@ -32,6 +33,33 @@ import { Navigate, NavLink as RouterNavLink, Route, Routes, useLocation } from "
 import type { AppUser, RoleCode } from "./domain/governance";
 import { hasRole } from "./application/services/accessControl";
 import { runtimeHostAdapter } from "./platform/runtimeHostAdapter";
+import { getRuntimePlatformTarget } from "./platform/runtimePlatformTarget";
+import { LoginPage } from "./ui/screens/LoginPage";
+
+const runtimePlatformTarget = getRuntimePlatformTarget();
+
+const authApiBaseUrl = (() => {
+  const env = (import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env;
+  return (env?.VITE_API_BASE_URL ?? "http://localhost:3001").replace(/\/$/, "");
+})();
+
+async function fetchCurrentSession(): Promise<AppUser | null> {
+  try {
+    const response = await fetch(`${authApiBaseUrl}/api/auth/me`, { credentials: "include" });
+    if (!response.ok) return null;
+    return (await response.json()) as AppUser;
+  } catch {
+    return null;
+  }
+}
+
+async function callLogout(): Promise<void> {
+  try {
+    await fetch(`${authApiBaseUrl}/api/auth/logout`, { method: "POST", credentials: "include" });
+  } catch {
+    // ignore
+  }
+}
 import { AccessDeniedState } from "./ui/components/AccessDeniedState";
 import { ReceptionistDashboardPage } from "./ui/screens/ReceptionistDashboardPage";
 import { ReceptionistHistoryPage } from "./ui/screens/ReceptionistHistoryPage";
@@ -70,9 +98,10 @@ const bootstrapDepartment = {
 
 const fallbackAdminUser: AppUser = {
   id: "user-bootstrap-admin",
+  userId: "admin@coreman.com",
   employeeCode: "BOOT-001",
   fullName: "Bootstrap Administrator",
-  email: "bootstrap.admin@local",
+  email: "admin@coreman.com",
   branchId: bootstrapBranch.id,
   departmentId: bootstrapDepartment.id,
   isActive: true,
@@ -290,6 +319,7 @@ export function App(): JSX.Element {
   const [navbarCollapsed, setNavbarCollapsed] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [availableUsers, setAvailableUsers] = useState<AppUser[]>([]);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(runtimePlatformTarget !== "SERVER");
   const [startupState, setStartupState] = useState<StartupState>({
     loading: true,
     error: null,
@@ -298,7 +328,35 @@ export function App(): JSX.Element {
   const location = useLocation();
   const platformIndicator = useMemo(() => runtimeHostAdapter.platform, []);
 
+  const handleLogin = useCallback((user: AppUser) => {
+    setIsAuthenticated(true);
+    setCurrentUserId(user.id);
+  }, []);
+
+  const handleLogout = useCallback(async () => {
+    await callLogout();
+    setIsAuthenticated(false);
+    setCurrentUserId(null);
+    setAvailableUsers([]);
+    setStartupState({ loading: true, error: null, issues: [] });
+  }, []);
+
+  // Session restore on mount for SERVER mode
   useEffect(() => {
+    if (runtimePlatformTarget !== "SERVER") return;
+    void fetchCurrentSession().then((user) => {
+      if (user) {
+        setIsAuthenticated(true);
+        setCurrentUserId(user.id);
+      } else {
+        setIsAuthenticated(false);
+        setStartupState({ loading: false, error: null, issues: [] });
+      }
+    });
+  }, []);
+
+  useEffect(() => {
+    if (runtimePlatformTarget === "SERVER" && !isAuthenticated) return;
     let active = true;
 
     async function loadStartupData(): Promise<void> {
@@ -365,7 +423,7 @@ export function App(): JSX.Element {
     return () => {
       active = false;
     };
-  }, []);
+  }, [isAuthenticated]);
 
   const currentUser = useMemo(
     () => availableUsers.find((user) => user.id === currentUserId) ?? availableUsers[0] ?? fallbackAdminUser,
@@ -393,6 +451,11 @@ export function App(): JSX.Element {
 
       return loginUsers[0]?.id ?? null;
     });
+  }
+
+  // Show login page for SERVER mode when not authenticated
+  if (runtimePlatformTarget === "SERVER" && !isAuthenticated) {
+    return <LoginPage onLogin={handleLogin} />;
   }
 
   if (startupState.loading) {
@@ -501,7 +564,7 @@ export function App(): JSX.Element {
           <Box style={{ flex: 1 }} />
 
           <Stack gap="xs">
-            {!navbarCollapsed && (
+            {!navbarCollapsed && runtimePlatformTarget !== "SERVER" && (
               <Select
                 value={selectableUsers.some((user) => user.id === currentUserId) ? currentUserId : currentUser.id}
                 onChange={(value) => setCurrentUserId(value)}
@@ -513,6 +576,17 @@ export function App(): JSX.Element {
                 leftSection={<UserCog size={14} />}
                 aria-label="Select active user"
               />
+            )}
+            {runtimePlatformTarget === "SERVER" && (
+              <Button
+                variant="subtle"
+                color="red"
+                size="xs"
+                fullWidth
+                onClick={() => void handleLogout()}
+              >
+                {navbarCollapsed ? "↩" : "Sign out"}
+              </Button>
             )}
           </Stack>
         </Stack>
