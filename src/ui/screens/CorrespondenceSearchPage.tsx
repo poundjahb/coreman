@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Anchor, Badge, Card, Container, Group, Select, Stack, Table, Text, TextInput, Title } from "@mantine/core";
+import { useSearchParams } from "react-router-dom";
 import type { Correspondence } from "../../domain/correspondence";
 import type { AppUser, Branch, Department } from "../../domain/governance";
 import { runtimeHostAdapter } from "../../platform/runtimeHostAdapter";
@@ -13,11 +14,10 @@ function toDateOnly(value: Date | undefined): string {
   return value.toISOString().slice(0, 10);
 }
 
-function formatDirection(direction: Correspondence["direction"]): string {
-  return direction === "INCOMING" ? "Incoming" : "Outgoing";
-}
-
 export function CorrespondenceSearchPage(): JSX.Element {
+  const [searchParams] = useSearchParams();
+  const requestedCorrespondenceId = searchParams.get("correspondenceId");
+  const requestedReference = searchParams.get("reference");
   const [reference, setReference] = useState("");
   const [subject, setSubject] = useState("");
   const [branch, setBranch] = useState<string | null>("all");
@@ -28,6 +28,14 @@ export function CorrespondenceSearchPage(): JSX.Element {
   const [departments, setDepartments] = useState<Department[]>([]);
   const [users, setUsers] = useState<AppUser[]>([]);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!requestedReference) {
+      return;
+    }
+
+    setReference(requestedReference);
+  }, [requestedReference]);
 
   useEffect(() => {
     let active = true;
@@ -91,6 +99,17 @@ export function CorrespondenceSearchPage(): JSX.Element {
           : "Unassigned"
       }));
   }, [branch, branches, departments, records, reference, status, subject, users]);
+
+  useEffect(() => {
+    if (!requestedCorrespondenceId) {
+      return;
+    }
+
+    const match = rows.find((item) => item.id === requestedCorrespondenceId);
+    if (match) {
+      setSelectedId(match.id);
+    }
+  }, [requestedCorrespondenceId, rows]);
 
   const selectedCorrespondence = useMemo(
     () => rows.find((item) => item.id === selectedId) ?? null,

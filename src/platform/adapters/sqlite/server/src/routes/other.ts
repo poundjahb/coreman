@@ -931,21 +931,6 @@ export function registerOtherRoutes(router: Router, db: Database.Database): void
         resolvedUpdateBy || resolvedCreateBy || "SYSTEM"
       );
 
-      appendAuditEvent(db, {
-        correspondenceId: id,
-        eventType: "CORRESPONDENCE_CREATED",
-        status: "SUCCESS",
-        payloadJson: JSON.stringify({
-          actionName: "CORRESPONDENCE_CREATED",
-          actionSource: resolveActionSource(resolvedCreateBy || "SYSTEM"),
-          referenceNumber: resolvedReferenceNumber,
-          recipientId: recipientId || null,
-          subject,
-          direction
-        }),
-        createdById: resolvedCreateBy || "SYSTEM"
-      });
-
       res.status(200).json({ message: "Correspondence saved successfully" });
     } catch (error) {
       if (error instanceof multer.MulterError && error.code === "LIMIT_FILE_SIZE") {

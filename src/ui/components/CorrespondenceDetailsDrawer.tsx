@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ActionIcon, Anchor, Badge, Divider, Drawer, Group, Modal, ScrollArea, SimpleGrid, Stack, Tabs, Text, Tooltip } from "@mantine/core";
+import { ActionIcon, Anchor, Badge, Divider, Drawer, Group, Modal, ScrollArea, SimpleGrid, Stack, Tabs, Text, Tooltip, Code } from "@mantine/core";
 import { Download, Eye } from "lucide-react";
 import { PDFViewerInDrawer } from "./PDFViewerInDrawer";
 
@@ -50,6 +50,47 @@ interface CorrespondenceDetailsDrawerProps {
 }
 
 export function CorrespondenceDetailsDrawer(props: CorrespondenceDetailsDrawerProps): JSX.Element {
+  function formatAuditEventType(eventType: string): string {
+    const labels: Record<string, string> = {
+      CORRESPONDENCE_CREATED: "Correspondence Created",
+      CORRESPONDENCE_UPDATED: "Correspondence Updated",
+      CORRESPONDENCE_ASSIGNED: "Task Assigned",
+      CORRESPONDENCE_STATUS_CHANGED: "Status Changed",
+      NOTIFICATION_SENT: "Notification Sent",
+      NOTIFICATION_SKIPPED: "Notification Skipped",
+      NOTIFICATION_FAILED: "Notification Failed",
+      WORKFLOW_FAILURE: "Workflow Failure",
+      AGENT_CALL: "Agent Called",
+      AGENT_RESPONSE: "Agent Response",
+      POWERFLOW_CALL: "Power Automate Called",
+      POWERFLOW_RESPONSE: "Power Automate Response"
+    };
+    return labels[eventType] ?? eventType.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+  }
+
+  function auditStatusColor(status: string): string {
+    if (status === "FAILED") return "red";
+    if (status === "SKIPPED") return "orange";
+    return "green";
+  }
+
+  function formatAuditDetails(raw: string): string {
+    try {
+      const parsed = JSON.parse(raw) as Record<string, unknown>;
+      if (parsed.actionName && typeof parsed.actionName === "string") {
+        const { actionName, actionSource, ...rest } = parsed;
+        const extra = Object.entries(rest)
+          .filter(([, v]) => v !== null && v !== undefined && v !== "")
+          .map(([k, v]) => `${k}: ${String(v)}`)
+          .join("  |  ");
+        return `${actionName} (${actionSource ?? "SYSTEM"})${extra ? "\n" + extra : ""}`;
+      }
+      return JSON.stringify(parsed, null, 2);
+    } catch {
+      return raw;
+    }
+  }
+
   const {
     opened,
     onClose,
@@ -240,12 +281,12 @@ export function CorrespondenceDetailsDrawer(props: CorrespondenceDetailsDrawerPr
                   audits.map((audit) => (
                     <Stack key={audit.id} gap={4} p="sm" style={{ border: "1px solid var(--mantine-color-gray-3)", borderRadius: 8 }}>
                       <Group justify="space-between" align="start">
-                        <Text fw={600} size="sm">{audit.eventType}</Text>
-                        <Badge variant="light" color={audit.status === "FAILED" ? "red" : "green"}>{audit.status}</Badge>
+                          <Text fw={600} size="sm">{formatAuditEventType(audit.eventType)}</Text>
+                          <Badge variant="light" color={auditStatusColor(audit.status)}>{audit.status}</Badge>
                       </Group>
                       <Text size="xs" c="dimmed">At: {audit.createdAt}</Text>
                       <Text size="xs" c="dimmed">By: {audit.createdBy}</Text>
-                      {audit.details && <Text size="sm">{audit.details}</Text>}
+                        {audit.details && <Code block style={{ fontSize: 11, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{formatAuditDetails(audit.details)}</Code>}
                     </Stack>
                   ))
                 ) : (

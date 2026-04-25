@@ -1,6 +1,7 @@
 import type { Router, Request, Response } from "express";
 import type Database from "better-sqlite3";
 import { randomUUID } from "crypto";
+import nodemailer from "nodemailer";
 
 const ALLOWED_STATUSES = new Set(["ASSIGNED", "IN_PROGRESS", "COMPLETED", "CANCELED"]);
 
@@ -17,6 +18,178 @@ type AssignmentPayload = {
   createdBy?: string;
   updatedBy?: string;
 };
+
+type WorkflowMode = "BASIC" | "EXTENDED";
+
+type EmailBackendType = "SMTP" | "GRAPH_MAIL" | "RESEND";
+
+interface EmailConfig {
+  backendType: EmailBackendType;
+  fromAddress: string;
+  connectionTimeoutMs: number;
+  smtpHost?: string;
+  smtpPort?: number;
+  smtpSecure?: boolean;
+  smtpUser?: string;
+  smtpPass?: string;
+  graphAccessToken?: string;
+  resendApiKey?: string;
+}
+
+type EmailSettingsRow = {
+  backendType: EmailBackendType;
+  config: string;
+  fromAddress: string;
+};
+
+type NotificationDispatchOutcome = "SENT" | "SKIPPED" | "FAILED";
+
+function resolveWorkflowMode(): WorkflowMode {
+  const raw = process.env.VITE_WORKFLOW_MODE ?? process.env.WORKFLOW_MODE;
+  if (raw === "EXTENDED") {
+    return "EXTENDED";
+  }
+
+  return "BASIC";
+}
+
+function getFrontendBaseUrl(): string {
+  const configured = process.env.COREMAN_FRONTEND_BASE_URL ?? process.env.VITE_APP_BASE_URL;
+  if (typeof configured === "string" && configured.trim().length > 0) {
+    return configured.replace(/\/$/, "");
+  }
+
+  return "http://localhost:5173";
+}
+
+function buildCorrespondenceRecordLink(correspondenceId: string): string {
+  return `${getFrontendBaseUrl()}/search?correspondenceId=${encodeURIComponent(correspondenceId)}`;
+}
+
+function rowToEmailConfig(row: EmailSettingsRow): EmailConfig {
+  const parsed = JSON.parse(row.config) as Record<string, unknown>;
+  return {
+    backendType: row.backendType,
+    fromAddress: row.fromAddress,
+    connectionTimeoutMs: typeof parsed.connectionTimeoutMs === "number" ? parsed.connectionTimeoutMs : 3000,
+    smtpHost: typeof parsed.smtpHost === "string" ? parsed.smtpHost : undefined,
+    smtpPort: typeof parsed.smtpPort === "number" ? parsed.smtpPort : undefined,
+    smtpSecure: typeof parsed.smtpSecure === "boolean" ? parsed.smtpSecure : undefined,
+    smtpUser: typeof parsed.smtpUser === "string" ? parsed.smtpUser : undefined,
+    smtpPass: typeof parsed.smtpPass === "string" ? parsed.smtpPass : undefined,
+    graphAccessToken: typeof parsed.graphAccessToken === "string" ? parsed.graphAccessToken : undefined,
+    resendApiKey: typeof parsed.resendApiKey === "string" ? parsed.resendApiKey : undefined
+  };
+}
+
+function getStoredEmailConfig(db: Database.Database): EmailConfig | null {
+  const row = db
+    .prepare("SELECT backendType, config, fromAddress FROM email_settings WHERE id = 1")
+    .get() as EmailSettingsRow | undefined;
+
+  if (!row) {
+    return null;
+  }
+
+  return rowToEmailConfig(row);
+}
+
+async function sendEmailUsingConfiguredBackend(config: EmailConfig, to: string, subject: string, body: string): Promise<string | undefined> {
+  if (config.backendType === "SMTP") {
+    const transport = nodemailer.createTransport({
+      host: config.smtpHost,
+      port: config.smtpPort,
+      secure: config.smtpSecure,
+      auth: config.smtpUser && config.smtpPass
+        ? {
+          user: config.smtpUser,
+          pass: config.smtpPass
+        }
+        : undefined,
+      connectionTimeout: config.connectionTimeoutMs,
+      greetingTimeout: config.connectionTimeoutMs,
+      socketTimeout: config.connectionTimeoutMs
+    });
+
+    const result = await transport.sendMail({
+      from: config.fromAddress,
+      to: to.trim(),
+      subject,
+      text: body
+    });
+
+    return result.messageId;
+  }
+
+  if (config.backendType === "GRAPH_MAIL") {
+    if (!config.graphAccessToken) {
+      throw new Error("Graph Mail API access token not available. Please re-authenticate through the UI.");
+    }
+
+    const response = await fetch("https://graph.microsoft.com/v1.0/me/sendMail", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${config.graphAccessToken}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        message: {
+          subject,
+          body: {
+            contentType: "HTML",
+            content: body
+          },
+          toRecipients: [
+            {
+              emailAddress: {
+                address: to.trim()
+              }
+            }
+          ]
+        },
+        saveToSentItems: true
+      })
+    });
+
+    if (!response.ok) {
+      const payload = await response.json() as { error?: { message?: string } };
+      throw new Error(`Graph Mail API error: ${payload.error?.message || response.statusText}`);
+    }
+
+    return undefined;
+  }
+
+  if (config.backendType === "RESEND") {
+    if (!config.resendApiKey) {
+      throw new Error("Resend API key not available. Please configure it in the settings.");
+    }
+
+    const response = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${config.resendApiKey}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        from: config.fromAddress,
+        to: to.trim(),
+        subject,
+        html: body,
+        text: body
+      })
+    });
+
+    if (!response.ok) {
+      const payload = await response.json() as { message?: string };
+      throw new Error(`Resend API error: ${payload.message || response.statusText}`);
+    }
+
+    const payload = await response.json() as { id?: string };
+    return payload.id;
+  }
+
+  throw new Error(`Unsupported email backend type: ${config.backendType}`);
+}
 
 function parseCcUserIds(raw: unknown): string[] {
   if (!Array.isArray(raw)) {
@@ -74,6 +247,167 @@ function appendAuditEvent(
   );
 }
 
+function appendNotificationAuditEvent(
+  db: Database.Database,
+  correspondenceId: string,
+  eventType: "NOTIFICATION_SENT" | "NOTIFICATION_SKIPPED" | "NOTIFICATION_FAILED" | "WORKFLOW_FAILURE",
+  status: "SUCCESS" | "SKIPPED" | "FAILED",
+  actorId: string,
+  payload: Record<string, unknown>,
+  errorMessage?: string
+): void {
+  const now = new Date().toISOString();
+  const payloadJson = JSON.stringify(payload);
+  db.prepare(
+    `INSERT INTO correspondence_audit_log (
+      id, correspondenceId, eventType, status, payloadJson, errorMessage, details, createdAt, createdById, createdBy
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  ).run(
+    randomUUID(),
+    correspondenceId,
+    eventType,
+    status,
+    payloadJson,
+    errorMessage ?? null,
+    payloadJson,
+    now,
+    actorId,
+    actorId
+  );
+}
+
+function composeAssignmentMail(taskType: string, deadline: string, reference: string, recordLink: string): { subject: string; body: string } {
+  return {
+    subject: `Task assigned: ${taskType} (${reference})`,
+    body: [
+      "A new task has been assigned to you.",
+      `Task type: ${taskType}`,
+      `Deadline: ${deadline}`,
+      `Correspondence: ${reference}`,
+      `Open record: ${recordLink}`
+    ].join("\n")
+  };
+}
+
+async function dispatchAssignmentNotification(
+  db: Database.Database,
+  assignment: {
+    id: string;
+    correspondenceId: string;
+    actionDefinitionId: string;
+    assigneeUserId: string;
+    deadline: string;
+  },
+  actorId: string,
+  mode: WorkflowMode
+): Promise<NotificationDispatchOutcome> {
+  const correspondence = db.prepare("SELECT referenceNumber FROM correspondences WHERE id = ?").get(assignment.correspondenceId) as
+    | { referenceNumber: string }
+    | undefined;
+  const actionDefinition = db.prepare("SELECT label FROM action_definitions WHERE id = ?").get(assignment.actionDefinitionId) as
+    | { label: string }
+    | undefined;
+  const assignee = db.prepare("SELECT email FROM users WHERE id = ?").get(assignment.assigneeUserId) as
+    | { email: string | null }
+    | undefined;
+
+  const reference = correspondence?.referenceNumber ?? assignment.correspondenceId;
+  const taskType = actionDefinition?.label ?? assignment.actionDefinitionId;
+  const recordLink = buildCorrespondenceRecordLink(assignment.correspondenceId);
+  const mail = composeAssignmentMail(taskType, assignment.deadline, reference, recordLink);
+
+  db.prepare(
+    `INSERT INTO notifications (id, recipientId, subject, body, correspondenceId, sentAt)
+     VALUES (?, ?, ?, ?, ?, ?)`
+  ).run(
+    randomUUID(),
+    assignment.assigneeUserId,
+    mail.subject,
+    mail.body,
+    assignment.correspondenceId,
+    new Date().toISOString()
+  );
+
+  const recipientEmail = assignee?.email?.trim();
+  const auditContext = {
+    mode,
+    assignmentId: assignment.id,
+    taskType,
+    deadline: assignment.deadline,
+    assigneeUserId: assignment.assigneeUserId,
+    correspondenceId: assignment.correspondenceId,
+    recordLink,
+    actionSource: resolveActionSource(actorId)
+  };
+
+  if (!recipientEmail) {
+    appendNotificationAuditEvent(
+      db,
+      assignment.correspondenceId,
+      "NOTIFICATION_SKIPPED",
+      "SKIPPED",
+      actorId,
+      {
+        ...auditContext,
+        reason: "RECIPIENT_EMAIL_MISSING"
+      }
+    );
+    return "SKIPPED";
+  }
+
+  const config = getStoredEmailConfig(db);
+  if (!config) {
+    appendNotificationAuditEvent(
+      db,
+      assignment.correspondenceId,
+      "NOTIFICATION_FAILED",
+      "FAILED",
+      actorId,
+      {
+        ...auditContext,
+        recipientEmail
+      },
+      "Email settings are not configured."
+    );
+    return "FAILED";
+  }
+
+  try {
+    const messageId = await sendEmailUsingConfiguredBackend(config, recipientEmail, mail.subject, mail.body);
+    appendNotificationAuditEvent(
+      db,
+      assignment.correspondenceId,
+      "NOTIFICATION_SENT",
+      "SUCCESS",
+      actorId,
+      {
+        ...auditContext,
+        backendType: config.backendType,
+        recipientEmail,
+        subject: mail.subject,
+        messageId
+      }
+    );
+    return "SENT";
+  } catch (error) {
+    appendNotificationAuditEvent(
+      db,
+      assignment.correspondenceId,
+      "NOTIFICATION_FAILED",
+      "FAILED",
+      actorId,
+      {
+        ...auditContext,
+        backendType: config.backendType,
+        recipientEmail,
+        subject: mail.subject
+      },
+      error instanceof Error ? error.message : "Notification delivery failed"
+    );
+    return "FAILED";
+  }
+}
+
 export function registerAssignmentsRoutes(router: Router, db: Database.Database): void {
   router.get("/api/assignments/:id", (req: Request, res: Response) => {
     try {
@@ -106,7 +440,7 @@ export function registerAssignmentsRoutes(router: Router, db: Database.Database)
     }
   });
 
-  router.post("/api/correspondences/:correspondenceId/assignments", (req: Request, res: Response) => {
+  router.post("/api/correspondences/:correspondenceId/assignments", async (req: Request, res: Response) => {
     try {
       const { correspondenceId } = req.params;
       const payload = req.body as AssignmentPayload;
@@ -185,6 +519,55 @@ export function registerAssignmentsRoutes(router: Router, db: Database.Database)
         assigneeUserId,
         status
       });
+
+      const workflowMode = resolveWorkflowMode();
+      try {
+        const notificationOutcome = await dispatchAssignmentNotification(
+          db,
+          {
+            id,
+            correspondenceId,
+            actionDefinitionId,
+            assigneeUserId,
+            deadline
+          },
+          createdBy,
+          workflowMode
+        );
+
+        if (notificationOutcome === "FAILED") {
+          appendNotificationAuditEvent(
+            db,
+            correspondenceId,
+            "WORKFLOW_FAILURE",
+            "FAILED",
+            createdBy,
+            {
+              mode: workflowMode,
+              actionName: "ASSIGNMENT_WORKFLOW",
+              assignmentId: id,
+              notificationOutcome,
+              actionSource: resolveActionSource(createdBy)
+            },
+            "Assignment workflow notification failed"
+          );
+        }
+      } catch (error) {
+        appendNotificationAuditEvent(
+          db,
+          correspondenceId,
+          "WORKFLOW_FAILURE",
+          "FAILED",
+          createdBy,
+          {
+            mode: workflowMode,
+            actionName: "ASSIGNMENT_WORKFLOW",
+            assignmentId: id,
+            actionSource: resolveActionSource(createdBy)
+          },
+          error instanceof Error ? error.message : "Assignment workflow execution failed"
+        );
+      }
 
       res.status(200).json({ message: "Assignment saved successfully" });
     } catch (error) {

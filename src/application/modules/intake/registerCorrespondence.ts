@@ -188,6 +188,26 @@ export async function registerCorrespondenceInHost(
   }
 
   const workflowMode = getRuntimeWorkflowMode();
+
+    try {
+      await hostAdapter.correspondenceAuditLog.append({
+        correspondenceId: correspondence.id,
+        eventType: "CORRESPONDENCE_CREATED",
+        status: "SUCCESS",
+        payloadJson: JSON.stringify({
+          actionName: "CORRESPONDENCE_CREATED",
+          actionSource: "USER",
+          referenceNumber: correspondence.reference,
+          recipientId: correspondence.recipientId ?? null,
+          subject: correspondence.subject,
+          direction: correspondence.direction
+        }),
+        createdById: actor.id
+      });
+    } catch {
+      // Non-fatal — preserve capture success even if audit append fails.
+    }
+
   try {
     await hostAdapter.postCaptureWorkflow.execute({
       correspondence,

@@ -18,6 +18,8 @@ import type { AppUser } from "../../domain/governance";
 import type { Correspondence } from "../../domain/correspondence";
 import type { CorrespondenceActionDefinition } from "../../domain/correspondenceAction";
 import { runtimeHostAdapter } from "../../platform/runtimeHostAdapter";
+import { runtimePlatformTarget } from "../../platform/runtimeHostAdapter";
+import { getRuntimeWorkflowMode } from "../../config/systemConfig";
 
 interface TaskAssignationPageProps {
   correspondenceId?: string;
@@ -31,6 +33,23 @@ function createId(): string {
   }
 
   return `asg-${Date.now()}-${Math.floor(Math.random() * 100000)}`;
+}
+
+function getFrontendBaseUrl(): string {
+  const fromEnv = (import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env?.VITE_APP_BASE_URL;
+  if (typeof fromEnv === "string" && fromEnv.length > 0) {
+    return fromEnv.replace(/\/$/, "");
+  }
+
+  if (typeof window !== "undefined") {
+    return window.location.origin;
+  }
+
+  return "http://localhost:5173";
+}
+
+function buildCorrespondenceRecordLink(correspondenceId: string): string {
+  return `${getFrontendBaseUrl()}/search?correspondenceId=${encodeURIComponent(correspondenceId)}`;
 }
 
 export function TaskAssignationPage(props: TaskAssignationPageProps): JSX.Element {
@@ -137,6 +156,132 @@ export function TaskAssignationPage(props: TaskAssignationPageProps): JSX.Elemen
         createdBy: effectiveCurrentUser.id,
         updatedBy: effectiveCurrentUser.id
       });
+
+        // SERVER mode route already appends audit; handle other adapters here.
+        if (runtimePlatformTarget !== "SERVER") {
+          try {
+            await runtimeHostAdapter.correspondenceAuditLog.append({
+              correspondenceId: selectedCorrespondenceId,
+              eventType: "CORRESPONDENCE_ASSIGNED",
+              status: "SUCCESS",
+              payloadJson: JSON.stringify({
+                actionName: "CORRESPONDENCE_ASSIGNED",
+                actionSource: "USER",
+                actionDefinitionId,
+                assigneeUserId
+              }),
+              createdById: effectiveCurrentUser.id
+            });
+          } catch {
+            // Non-fatal — assignment already saved.
+          }
+
+          const workflowMode = getRuntimeWorkflowMode();
+          const taskType = actionDefinitions.find((item) => item.id === actionDefinitionId)?.label ?? actionDefinitionId;
+          const deadlineLabel = deadline;
+          const selectedCorrespondence = correspondences.find((item) => item.id === selectedCorrespondenceId);
+          const reference = selectedCorrespondence?.reference ?? selectedCorrespondenceId;
+          const recordLink = buildCorrespondenceRecordLink(selectedCorrespondenceId);
+          const subject = `Task assigned: ${taskType} (${reference})`;
+          const body = [
+            "A new task has been assigned to you.",
+            `Task type: ${taskType}`,
+            `Deadline: ${deadlineLabel}`,
+            `Correspondence: ${reference}`,
+            `Open record: ${recordLink}`
+          ].join("\n");
+          const assignee = users.find((user) => user.id === assigneeUserId);
+          const recipientEmail = assignee?.email?.trim();
+
+          if (!recipientEmail) {
+            try {
+              await runtimeHostAdapter.correspondenceAuditLog.append({
+                correspondenceId: selectedCorrespondenceId,
+                eventType: "NOTIFICATION_SKIPPED",
+                status: "SKIPPED",
+                payloadJson: JSON.stringify({
+                  mode: workflowMode,
+                  actionName: "ASSIGNMENT_WORKFLOW",
+                  taskType,
+                  deadline: deadlineLabel,
+                  assigneeUserId,
+                  recordLink,
+                  reason: "RECIPIENT_EMAIL_MISSING",
+                  actionSource: "USER"
+                }),
+                createdById: effectiveCurrentUser.id
+              });
+            } catch {
+              // Keep assignment success even if audit append fails.
+            }
+          } else {
+            try {
+              await runtimeHostAdapter.notifications.send({
+                recipientId: assigneeUserId,
+                subject,
+                body,
+                correspondenceId: selectedCorrespondenceId
+              });
+
+              await runtimeHostAdapter.correspondenceAuditLog.append({
+                correspondenceId: selectedCorrespondenceId,
+                eventType: "NOTIFICATION_SENT",
+                status: "SUCCESS",
+                payloadJson: JSON.stringify({
+                  mode: workflowMode,
+                  actionName: "ASSIGNMENT_WORKFLOW",
+                  taskType,
+                  deadline: deadlineLabel,
+                  assigneeUserId,
+                  recipientEmail,
+                  subject,
+                  recordLink,
+                  actionSource: "USER"
+                }),
+                createdById: effectiveCurrentUser.id
+              });
+            } catch (workflowError) {
+              try {
+                await runtimeHostAdapter.correspondenceAuditLog.append({
+                  correspondenceId: selectedCorrespondenceId,
+                  eventType: "NOTIFICATION_FAILED",
+                  status: "FAILED",
+                  payloadJson: JSON.stringify({
+                    mode: workflowMode,
+                    actionName: "ASSIGNMENT_WORKFLOW",
+                    taskType,
+                    deadline: deadlineLabel,
+                    assigneeUserId,
+                    recipientEmail,
+                    subject,
+                    recordLink,
+                    actionSource: "USER"
+                  }),
+                  errorMessage: workflowError instanceof Error ? workflowError.message : "Assignment notification failed",
+                  createdById: effectiveCurrentUser.id
+                });
+
+                await runtimeHostAdapter.correspondenceAuditLog.append({
+                  correspondenceId: selectedCorrespondenceId,
+                  eventType: "WORKFLOW_FAILURE",
+                  status: "FAILED",
+                  payloadJson: JSON.stringify({
+                    mode: workflowMode,
+                    actionName: "ASSIGNMENT_WORKFLOW",
+                    assigneeUserId,
+                    taskType,
+                    deadline: deadlineLabel,
+                    actionSource: "USER"
+                  }),
+                  errorMessage: workflowError instanceof Error ? workflowError.message : "Assignment workflow execution failed",
+                  createdById: effectiveCurrentUser.id
+                });
+              } catch {
+                // Preserve assignment success if workflow audits fail.
+              }
+            }
+          }
+        }
 
       setMessage("Assignment created successfully.");
       setActionDefinitionId(null);
