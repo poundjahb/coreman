@@ -13,6 +13,7 @@ import type { IUserRepository } from "./contracts/IUserRepository";
 import type { ICorrespondenceActionDefinitionRepository } from "./contracts/ICorrespondenceActionDefinitionRepository";
 import type { ICorrespondenceTaskAssignmentRepository } from "./contracts/ICorrespondenceTaskAssignmentRepository";
 import type { IWorkflowPluginService } from "./contracts/IWorkflowPluginService";
+import type { IDateManagementService } from "./contracts/IDateManagementService";
 
 export interface PlatformIndicator {
   target: PlatformTarget;
@@ -35,5 +36,6 @@ export interface IHostAdapter {
   correspondenceAuditLog: ICorrespondenceAuditLogRepository;
   postCaptureWorkflow: IPostCaptureWorkflowService;
   workflowPlugins: IWorkflowPluginService;
+  dateManagement: IDateManagementService;
   sequenceStore: SequenceStore;
 }

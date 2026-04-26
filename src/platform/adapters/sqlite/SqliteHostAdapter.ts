@@ -14,6 +14,7 @@ import { SqliteSmtpSettingsService } from "./SqliteSmtpSettingsService";
 import { SqliteCorrespondenceActionDefinitionRepository } from "./SqliteCorrespondenceActionDefinitionRepository";
 import { SmtpEmailService } from "./SmtpEmailService";
 import { InMemoryWorkflowPluginService } from "../inMemory/InMemoryWorkflowPluginService";
+import { SqliteDateManagementService } from "./SqliteDateManagementService";
 
 export const sqliteMainProcessPlatformIndicator = buildPlatformIndicator({
   target: "SQLITE",
@@ -60,6 +61,7 @@ export function createSqliteHostAdapter(
     correspondenceAuditLog,
     postCaptureWorkflow: new SqlitePostCaptureWorkflowService(notifications, correspondenceAuditLog),
     workflowPlugins: new InMemoryWorkflowPluginService(),
+    dateManagement: new SqliteDateManagementService(db),
     sequenceStore: new SqliteSequenceStore(db)
   };
 
@@ -146,6 +148,10 @@ export const sqliteHostAdapter: IHostAdapter = (() => {
       listBindings: () => notReady("workflowPlugins.listBindings"),
       saveBinding: () => notReady("workflowPlugins.saveBinding"),
       deleteBinding: () => notReady("workflowPlugins.deleteBinding")
+    },
+    dateManagement: {
+      getThresholds: () => notReady("dateManagement.getThresholds"),
+      saveThresholds: () => notReady("dateManagement.saveThresholds")
     },
     sequenceStore: { next: () => notReady("next") }
   };

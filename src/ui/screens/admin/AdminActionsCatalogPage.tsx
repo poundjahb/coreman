@@ -74,6 +74,13 @@ export function AdminActionsCatalogPage(props?: { embedded?: boolean }): JSX.Ele
       return "Workflow must be disabled when trigger mode is set to NONE.";
     }
 
+    if (editor.defaultDeadlineDays.trim()) {
+      const defaultDeadlineDays = Number.parseInt(editor.defaultDeadlineDays.trim(), 10);
+      if (Number.isNaN(defaultDeadlineDays) || defaultDeadlineDays < 0) {
+        return "Default deadline must be a non-negative number of days.";
+      }
+    }
+
     if (!editor.workflowEnabled) {
       return null;
     }
@@ -121,8 +128,8 @@ export function AdminActionsCatalogPage(props?: { embedded?: boolean }): JSX.Ele
     const timeout = Number.parseInt(editor.workflowTimeoutMs, 10);
     const retries = Number.parseInt(editor.retryMaxAttempts, 10);
     const backoff = Number.parseInt(editor.retryBackoffMs, 10);
-    const defaultSlaDays = editor.defaultSlaDays.trim()
-      ? Number.parseInt(editor.defaultSlaDays.trim(), 10)
+    const defaultDeadlineDays = editor.defaultDeadlineDays.trim()
+      ? Number.parseInt(editor.defaultDeadlineDays.trim(), 10)
       : undefined;
 
     return {
@@ -142,7 +149,8 @@ export function AdminActionsCatalogPage(props?: { embedded?: boolean }): JSX.Ele
       payloadTemplate: editor.payloadTemplate.trim() || undefined,
       retryMaxAttempts: retries,
       retryBackoffMs: backoff,
-      defaultSlaDays,
+      defaultDeadlineDays,
+      defaultSlaDays: defaultDeadlineDays,
       isActive: editor.isActive,
       createdAt: existing?.createdAt ?? now,
       updatedAt: now
@@ -266,6 +274,13 @@ export function AdminActionsCatalogPage(props?: { embedded?: boolean }): JSX.Ele
                 }))
               }
             />
+            <TextInput
+              label="Default Deadline (days)"
+              value={editor.defaultDeadlineDays}
+              onChange={(event) =>
+                setEditor((current) => ({ ...current, defaultDeadlineDays: event.currentTarget.value }))
+              }
+            />
           </Group>
           <Group grow>
             <Switch
@@ -364,13 +379,6 @@ export function AdminActionsCatalogPage(props?: { embedded?: boolean }): JSX.Ele
                   value={editor.retryBackoffMs}
                   onChange={(event) =>
                     setEditor((current) => ({ ...current, retryBackoffMs: event.currentTarget.value }))
-                  }
-                />
-                <TextInput
-                  label="Default SLA (days)"
-                  value={editor.defaultSlaDays}
-                  onChange={(event) =>
-                    setEditor((current) => ({ ...current, defaultSlaDays: event.currentTarget.value }))
                   }
                 />
               </Group>

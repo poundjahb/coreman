@@ -128,17 +128,19 @@ function resolveRecipientUser(context, correspondence) {
   const recipientId = correspondence?.recipientId
     ?? correspondence?.actionOwnerId
     ?? context.context?.assigneeUserId
-    ?? context.actorId;
+    ?? null;
 
   if (!recipientId || typeof recipientId !== "string") {
-    return { recipientId: context.actorId, fullName: context.actorId, email: "" };
+    return { recipientId: null, fullName: null, email: null };
   }
 
   const user = context.resources.users.find(recipientId);
   const fullName = typeof user?.fullName === "string" && user.fullName.trim().length > 0
     ? user.fullName
     : recipientId;
-  const email = typeof user?.email === "string" ? user.email.trim() : "";
+  const email = typeof user?.email === "string" && user.email.trim().length > 0
+    ? user.email.trim()
+    : null;
 
   return {
     recipientId,
@@ -147,15 +149,55 @@ function resolveRecipientUser(context, correspondence) {
   };
 }
 
+function resolveRegisteredByName(context, correspondence) {
+  const registeredById = correspondence?.createBy
+    ?? correspondence?.registeredById
+    ?? context.actorId;
+
+  if (!registeredById || typeof registeredById !== "string") {
+    return context.actorId;
+  }
+
+  const user = context.resources.users.find(registeredById);
+  if (typeof user?.fullName === "string" && user.fullName.trim().length > 0) {
+    return user.fullName;
+  }
+
+  return registeredById;
+}
+
+function resolveBranchName(context, correspondence) {
+  const branchId = correspondence?.branchId;
+  if (!branchId || typeof branchId !== "string") {
+    return "Unknown Branch";
+  }
+
+  const branch = context.resources.branches.find(branchId);
+  if (typeof branch?.name === "string" && branch.name.trim().length > 0) {
+    return branch.name;
+  }
+
+  return branchId;
+}
+
+function resolveDepartmentName(context, correspondence) {
+  const departmentId = correspondence?.departmentId;
+  if (!departmentId || typeof departmentId !== "string" || departmentId === "__INDIVIDUAL__") {
+    return null;
+  }
+
+  const department = context.resources.departments.find(departmentId);
+  if (typeof department?.name === "string" && department.name.trim().length > 0) {
+    return department.name;
+  }
+
+  return departmentId;
+}
+
 function resolveAvailableActions(context) {
   const definitions = context.resources.actionDefinitions.listActive();
   return definitions.map((definition) => ({
     action: typeof definition.code === "string" && definition.code.trim().length > 0
-      ? definition.code
-      : typeof definition.label === "string" && definition.label.trim().length > 0
-        ? definition.label
-        : String(definition.id ?? "UNKNOWN_ACTION"),
-    Action: typeof definition.code === "string" && definition.code.trim().length > 0
       ? definition.code
       : typeof definition.label === "string" && definition.label.trim().length > 0
         ? definition.label
@@ -188,15 +230,27 @@ export async function execute(context) {
 
   const attachment = await readAttachment(attachmentPath, correspondence);
   const endpointUrl = resolveServiceUrl(context);
-  const locationUrl = resolveLocationUrl(context);
+  const location = resolveLocationUrl(context);
   const authToken = getConfig(context, AUTH_TOKEN_ENV_KEY)?.trim();
   const recipient = resolveRecipientUser(context, correspondence);
+  const registeredBy = resolveRegisteredByName(context, correspondence);
+  const branch = resolveBranchName(context, correspondence);
+  const department = resolveDepartmentName(context, correspondence);
   const actions = resolveAvailableActions(context);
 
   const payload = {
-    username: recipient.fullName,
+    id: String(correspondence?.id ?? context.correspondenceId),
+    senderReference: typeof correspondence?.senderReference === "string" ? correspondence.senderReference : null,
+    subject: typeof correspondence?.subject === "string" ? correspondence.subject : "",
+    sender: typeof correspondence?.fromTo === "string" ? correspondence.fromTo : "",
+    organisation: typeof correspondence?.organisation === "string" ? correspondence.organisation : null,
+    correspondenceDate: typeof correspondence?.correspondenceDate === "string" ? correspondence.correspondenceDate : null,
+    location,
+    branch,
+    department,
+    registeredBy,
+    recipient: recipient.fullName,
     email: recipient.email,
-    location: locationUrl,
     files: {
       fileName: attachment.fileName,
       fileContentBytes: attachment.base64
@@ -240,9 +294,12 @@ export async function execute(context) {
     payload: {
       pluginKey: metadata.pluginKey,
       endpointUrl,
-      username: recipient.fullName,
+      payloadId: payload.id,
+      location,
+      recipient: recipient.fullName,
       email: recipient.email,
-      location: locationUrl,
+      branch,
+      department,
       fileName: attachment.fileName,
       summary,
       actionsCount: actions.length,
@@ -254,9 +311,10 @@ export async function execute(context) {
     delivered: true,
     triggerCode: context.trigger.code,
     endpointUrl,
-    username: recipient.fullName,
+    payloadId: payload.id,
+    location,
+    recipient: recipient.fullName,
     email: recipient.email,
-    location: locationUrl,
     fileName: attachment.fileName,
     summary,
     actionsCount: actions.length,

@@ -15,6 +15,7 @@ import type { NotificationPayload } from "../../contracts/INotificationService";
 import type { SendTestEmailCommand } from "../../contracts/ISmtpSettingsService";
 import type { EmailConfig, SendTestEmailCommand as SendTestEmailCommand2 } from "../../contracts/IEmailService";
 import type { SaveWorkflowBindingCommand } from "../../contracts/IWorkflowPluginService";
+import type { DateManagementThresholds } from "../../../domain/dateManagement";
 import type {
   WorkflowBindingRecord,
   WorkflowCatalogSnapshot,
@@ -114,6 +115,9 @@ function hydrateTaskAssignment(raw: CorrespondenceTaskAssignment): Correspondenc
   return {
     ...raw,
     deadline: new Date(raw.deadline),
+    executionComment: raw.executionComment ?? undefined,
+    closedAt: raw.closedAt ? new Date(raw.closedAt) : undefined,
+    closedBy: raw.closedBy ?? undefined,
     createdAt: new Date(raw.createdAt),
     updatedAt: new Date(raw.updatedAt)
   };
@@ -390,6 +394,12 @@ export function createHttpHostAdapter(options: HttpHostAdapterOptions = {}): IHo
       },
       deleteBinding: (id: string): Promise<void> =>
         requestJson<void>(apiBaseUrl, `/api/workflow-bindings/${encodeURIComponent(id)}`, "DELETE")
+    },
+    dateManagement: {
+      getThresholds: (): Promise<DateManagementThresholds> =>
+        requestJson<DateManagementThresholds>(apiBaseUrl, "/api/date-management-settings", "GET"),
+      saveThresholds: (thresholds: DateManagementThresholds): Promise<void> =>
+        requestJson<void>(apiBaseUrl, "/api/date-management-settings", "PUT", thresholds)
     },
     postCaptureWorkflow: {
       execute: (command: ExecutePostCaptureWorkflowCommand): Promise<void> =>

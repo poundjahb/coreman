@@ -200,10 +200,13 @@ export function initializeDatabase(): Database.Database {
       correspondenceId TEXT NOT NULL,
       actionDefinitionId TEXT NOT NULL,
       description TEXT,
+      executionComment TEXT,
       assigneeUserId TEXT NOT NULL,
       ccUserIdsJson TEXT NOT NULL DEFAULT '[]',
       deadline TEXT NOT NULL,
       status TEXT NOT NULL,
+      closedAt TEXT,
+      closedBy TEXT,
       createdAt TEXT NOT NULL,
       updatedAt TEXT NOT NULL,
       createdBy TEXT NOT NULL,
@@ -297,6 +300,17 @@ export function initializeDatabase(): Database.Database {
         (bindingType = 'ACTION' AND actionDefinitionId IS NOT NULL AND triggerCode IS NULL)
       )
     );
+
+    CREATE TABLE IF NOT EXISTS date_management_settings (
+      id INTEGER PRIMARY KEY CHECK(id = 1),
+      assignmentReminderDays INTEGER NOT NULL,
+      assignmentEscalationDays INTEGER NOT NULL,
+      assignmentAutoCloseDays INTEGER NOT NULL,
+      recipientInactionReminderDays INTEGER NOT NULL,
+      recipientInactionEscalationDays INTEGER NOT NULL,
+      recipientInactionAutoCloseDays INTEGER NOT NULL,
+      updatedAt TEXT NOT NULL
+    );
   `);
 
   db.exec("CREATE INDEX IF NOT EXISTS idx_workflow_plugins_platform_enabled ON workflow_plugins (platformTarget, isEnabled)");
@@ -361,6 +375,21 @@ export function initializeDatabase(): Database.Database {
     db.exec("ALTER TABLE correspondence_task_assignments ADD COLUMN description TEXT");
   }
 
+  const hasAssignmentExecutionComment = assignmentColumns.some((column) => column.name === "executionComment");
+  if (!hasAssignmentExecutionComment) {
+    db.exec("ALTER TABLE correspondence_task_assignments ADD COLUMN executionComment TEXT");
+  }
+
+  const hasAssignmentClosedAt = assignmentColumns.some((column) => column.name === "closedAt");
+  if (!hasAssignmentClosedAt) {
+    db.exec("ALTER TABLE correspondence_task_assignments ADD COLUMN closedAt TEXT");
+  }
+
+  const hasAssignmentClosedBy = assignmentColumns.some((column) => column.name === "closedBy");
+  if (!hasAssignmentClosedBy) {
+    db.exec("ALTER TABLE correspondence_task_assignments ADD COLUMN closedBy TEXT");
+  }
+
   const auditColumns = db.prepare("PRAGMA table_info(correspondence_audit_log)").all() as Array<{ name: string }>;
   const hasAuditStatus = auditColumns.some((column) => column.name === "status");
   if (!hasAuditStatus) {
@@ -392,8 +421,44 @@ export function initializeDatabase(): Database.Database {
     db.exec("ALTER TABLE workflow_bindings ADD COLUMN priority INTEGER NOT NULL DEFAULT 100");
   }
 
+  const dateManagementColumns = db.prepare("PRAGMA table_info(date_management_settings)").all() as Array<{ name: string }>;
+  if (!dateManagementColumns.some((column) => column.name === "assignmentReminderDays")) {
+    db.exec("ALTER TABLE date_management_settings ADD COLUMN assignmentReminderDays INTEGER NOT NULL DEFAULT 2");
+  }
+  if (!dateManagementColumns.some((column) => column.name === "assignmentEscalationDays")) {
+    db.exec("ALTER TABLE date_management_settings ADD COLUMN assignmentEscalationDays INTEGER NOT NULL DEFAULT 5");
+  }
+  if (!dateManagementColumns.some((column) => column.name === "assignmentAutoCloseDays")) {
+    db.exec("ALTER TABLE date_management_settings ADD COLUMN assignmentAutoCloseDays INTEGER NOT NULL DEFAULT 10");
+  }
+  if (!dateManagementColumns.some((column) => column.name === "recipientInactionReminderDays")) {
+    db.exec("ALTER TABLE date_management_settings ADD COLUMN recipientInactionReminderDays INTEGER NOT NULL DEFAULT 2");
+  }
+  if (!dateManagementColumns.some((column) => column.name === "recipientInactionEscalationDays")) {
+    db.exec("ALTER TABLE date_management_settings ADD COLUMN recipientInactionEscalationDays INTEGER NOT NULL DEFAULT 5");
+  }
+  if (!dateManagementColumns.some((column) => column.name === "recipientInactionAutoCloseDays")) {
+    db.exec("ALTER TABLE date_management_settings ADD COLUMN recipientInactionAutoCloseDays INTEGER NOT NULL DEFAULT 10");
+  }
+  if (!dateManagementColumns.some((column) => column.name === "updatedAt")) {
+    db.exec("ALTER TABLE date_management_settings ADD COLUMN updatedAt TEXT NOT NULL DEFAULT ''");
+  }
+
   db.exec("UPDATE correspondence_audit_log SET createdById = createdBy WHERE createdById IS NULL");
   db.exec("UPDATE correspondence_audit_log SET payloadJson = details WHERE payloadJson IS NULL AND details IS NOT NULL");
+
+  db.prepare(
+    `INSERT OR IGNORE INTO date_management_settings (
+      id,
+      assignmentReminderDays,
+      assignmentEscalationDays,
+      assignmentAutoCloseDays,
+      recipientInactionReminderDays,
+      recipientInactionEscalationDays,
+      recipientInactionAutoCloseDays,
+      updatedAt
+    ) VALUES (1, 2, 5, 10, 2, 5, 10, ?)`
+  ).run(new Date().toISOString());
 
   // --- Auth: passwordHash migration ---
   const userColumns = db.prepare("PRAGMA table_info(users)").all() as Array<{ name: string }>;

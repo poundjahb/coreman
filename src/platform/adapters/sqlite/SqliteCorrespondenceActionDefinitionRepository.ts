@@ -3,6 +3,13 @@ import type { CorrespondenceActionDefinition } from "../../../domain/corresponde
 import type { ICorrespondenceActionDefinitionRepository } from "../../contracts/ICorrespondenceActionDefinitionRepository";
 
 function rowToDefinition(row: Record<string, unknown>): CorrespondenceActionDefinition {
+  const defaultDeadlineDays = row["defaultDeadlineDays"] === null
+    ? undefined
+    : Number(row["defaultDeadlineDays"]);
+  const defaultSlaDays = row["defaultSlaDays"] === null
+    ? undefined
+    : Number(row["defaultSlaDays"]);
+
   return {
     id: row["id"] as string,
     code: row["code"] as string,
@@ -20,7 +27,8 @@ function rowToDefinition(row: Record<string, unknown>): CorrespondenceActionDefi
     payloadTemplate: (row["payloadTemplate"] as string | null) ?? undefined,
     retryMaxAttempts: Number(row["retryMaxAttempts"]),
     retryBackoffMs: Number(row["retryBackoffMs"]),
-    defaultSlaDays: row["defaultSlaDays"] === null ? undefined : Number(row["defaultSlaDays"]),
+    defaultDeadlineDays: defaultDeadlineDays ?? defaultSlaDays,
+    defaultSlaDays,
     isActive: Boolean(row["isActive"]),
     createdAt: new Date(row["createdAt"] as string),
     updatedAt: new Date(row["updatedAt"] as string)
@@ -61,12 +69,12 @@ export class SqliteCorrespondenceActionDefinitionRepository
           id, code, label, description, category, requiresOwner, triggerMode,
           workflowEnabled, workflowMethod, workflowEndpointUrl, workflowTimeoutMs,
           authType, authSecretRef, payloadTemplate, retryMaxAttempts, retryBackoffMs,
-          defaultSlaDays, isActive, createdAt, updatedAt
+          defaultDeadlineDays, defaultSlaDays, isActive, createdAt, updatedAt
         ) VALUES (
           @id, @code, @label, @description, @category, @requiresOwner, @triggerMode,
           @workflowEnabled, @workflowMethod, @workflowEndpointUrl, @workflowTimeoutMs,
           @authType, @authSecretRef, @payloadTemplate, @retryMaxAttempts, @retryBackoffMs,
-          @defaultSlaDays, @isActive, @createdAt, @updatedAt
+          @defaultDeadlineDays, @defaultSlaDays, @isActive, @createdAt, @updatedAt
         )
         ON CONFLICT(id) DO UPDATE SET
           code = excluded.code,
@@ -84,6 +92,7 @@ export class SqliteCorrespondenceActionDefinitionRepository
           payloadTemplate = excluded.payloadTemplate,
           retryMaxAttempts = excluded.retryMaxAttempts,
           retryBackoffMs = excluded.retryBackoffMs,
+            defaultDeadlineDays = excluded.defaultDeadlineDays,
           defaultSlaDays = excluded.defaultSlaDays,
           isActive = excluded.isActive,
           updatedAt = excluded.updatedAt`
@@ -96,7 +105,8 @@ export class SqliteCorrespondenceActionDefinitionRepository
         workflowEndpointUrl: definition.workflowEndpointUrl ?? null,
         authSecretRef: definition.authSecretRef ?? null,
         payloadTemplate: definition.payloadTemplate ?? null,
-        defaultSlaDays: definition.defaultSlaDays ?? null,
+        defaultDeadlineDays: definition.defaultDeadlineDays ?? definition.defaultSlaDays ?? null,
+        defaultSlaDays: definition.defaultSlaDays ?? definition.defaultDeadlineDays ?? null,
         isActive: definition.isActive ? 1 : 0,
         createdAt: definition.createdAt.toISOString(),
         updatedAt: definition.updatedAt.toISOString()

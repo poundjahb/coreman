@@ -10,6 +10,7 @@ import type { IPostCaptureWorkflowService } from "../../contracts/IPostCaptureWo
 import type { ISmtpSettingsService } from "../../contracts/ISmtpSettingsService";
 import type { IEmailService } from "../../contracts/IEmailService";
 import type { IWorkflowPluginService } from "../../contracts/IWorkflowPluginService";
+import type { IDateManagementService } from "../../contracts/IDateManagementService";
 import type { SequenceStore } from "../../../domain/reference";
 import type { ICorrespondenceActionDefinitionRepository } from "../../contracts/ICorrespondenceActionDefinitionRepository";
 import type { ICorrespondenceTaskAssignmentRepository } from "../../contracts/ICorrespondenceTaskAssignmentRepository";
@@ -117,6 +118,11 @@ const dataverseWorkflowPlugins: IWorkflowPluginService = {
   deleteBinding: () => notImplemented("workflowPlugins.deleteBinding")
 };
 
+const dataverseDateManagement: IDateManagementService = {
+  getThresholds: () => notImplemented("dateManagement.getThresholds"),
+  saveThresholds: () => notImplemented("dateManagement.saveThresholds")
+};
+
 export const dataverseHostAdapter: IHostAdapter = {
   platform: dataversePlatformIndicator,
   correspondences: dataverseCorrespondenceRepository,
@@ -132,5 +138,6 @@ export const dataverseHostAdapter: IHostAdapter = {
   correspondenceAuditLog: dataverseAuditLog,
   postCaptureWorkflow: dataversePostCaptureWorkflow,
   workflowPlugins: dataverseWorkflowPlugins,
+  dateManagement: dataverseDateManagement,
   sequenceStore: dataverseSequenceStore
 };

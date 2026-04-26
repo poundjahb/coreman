@@ -21,6 +21,7 @@ import { InMemoryEmailService } from "./InMemoryEmailService";
 import { InMemoryUserRepository } from "./InMemoryUserRepository";
 import { InMemoryCorrespondenceAuditLogRepository } from "./InMemoryCorrespondenceAuditLogRepository";
 import { InMemoryWorkflowPluginService } from "./InMemoryWorkflowPluginService";
+import { InMemoryDateManagementService } from "./InMemoryDateManagementService";
 import { buildPlatformIndicator } from "../../platformIndicator";
 
 export const inMemoryPlatformIndicator = buildPlatformIndicator({
@@ -51,6 +52,7 @@ export function createInMemoryHostAdapter(): IHostAdapter {
     correspondenceAuditLog,
     postCaptureWorkflow: new InMemoryPostCaptureWorkflowService(notifications, correspondenceAuditLog),
     workflowPlugins: new InMemoryWorkflowPluginService(),
+    dateManagement: new InMemoryDateManagementService(),
     sequenceStore: new InMemorySequenceStore()
   };
 }

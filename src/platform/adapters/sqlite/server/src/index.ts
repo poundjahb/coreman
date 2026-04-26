@@ -13,6 +13,7 @@ import { registerActionDefinitionsRoutes } from "./routes/actionDefinitions.js";
 import { registerAssignmentsRoutes } from "./routes/assignments.js";
 import { registerOtherRoutes } from "./routes/other.js";
 import { registerWorkflowPluginRoutes } from "./routes/workflowPlugins.js";
+import { registerDateManagementRoutes } from "./routes/dateManagement.js";
 
 // Extend express-session with our custom property
 declare module "express-session" {
@@ -83,6 +84,7 @@ registerActionDefinitionsRoutes(router, db);
 registerAssignmentsRoutes(router, db);
 registerOtherRoutes(router, db);
 registerWorkflowPluginRoutes(router, db);
+registerDateManagementRoutes(router, db);
 
 // Mount router
 app.use(router);

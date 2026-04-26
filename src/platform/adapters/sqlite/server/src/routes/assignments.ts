@@ -10,10 +10,13 @@ type AssignmentPayload = {
   id?: string;
   actionDefinitionId?: string;
   description?: string;
+  executionComment?: string;
   assigneeUserId?: string;
   ccUserIds?: string[];
   deadline?: string;
   status?: string;
+  closedAt?: string;
+  closedBy?: string;
   createdAt?: string;
   updatedAt?: string;
   createdBy?: string;
@@ -301,7 +304,7 @@ function updateCorrespondenceStatusBasedOnTasks(db: Database.Database, correspon
     } else {
       const inProgressCount = tasks.filter((t) => t.status === "IN_PROGRESS").length;
       const completedCount = tasks.filter((t) => t.status === "COMPLETED").length;
-      const cancelledCount = tasks.filter((t) => t.status === "CANCELLED").length;
+      const cancelledCount = tasks.filter((t) => t.status === "CANCELED").length;
       const allTasksCancelled = cancelledCount === tasks.length;
       const allTasksCompleted = completedCount === tasks.length;
 
@@ -329,7 +332,7 @@ function updateCorrespondenceStatusBasedOnTasks(db: Database.Database, correspon
         totalTasks: tasks.length,
         completedTasks: tasks.filter((t) => t.status === "COMPLETED").length,
         inProgressTasks: tasks.filter((t) => t.status === "IN_PROGRESS").length,
-        cancelledTasks: tasks.filter((t) => t.status === "CANCELLED").length
+        cancelledTasks: tasks.filter((t) => t.status === "CANCELED").length
       });
     }
   } catch (error) {
@@ -538,6 +541,7 @@ export function registerAssignmentsRoutes(router: Router, db: Database.Database)
         id,
         actionDefinitionId,
         description,
+        executionComment,
         assigneeUserId,
         deadline,
         status,
@@ -581,9 +585,9 @@ export function registerAssignmentsRoutes(router: Router, db: Database.Database)
 
       const stmt = db.prepare(`
         INSERT OR REPLACE INTO correspondence_task_assignments (
-          id, correspondenceId, actionDefinitionId, description, assigneeUserId, ccUserIdsJson,
-          deadline, status, createdAt, updatedAt, createdBy, updatedBy
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          id, correspondenceId, actionDefinitionId, description, executionComment, assigneeUserId, ccUserIdsJson,
+          deadline, status, closedAt, closedBy, createdAt, updatedAt, createdBy, updatedBy
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
 
       stmt.run(
@@ -591,10 +595,13 @@ export function registerAssignmentsRoutes(router: Router, db: Database.Database)
         correspondenceId,
         actionDefinitionId,
         typeof description === "string" && description.trim().length > 0 ? description.trim() : null,
+        typeof executionComment === "string" && executionComment.trim().length > 0 ? executionComment.trim() : null,
         assigneeUserId,
         JSON.stringify(ccUserIds),
         deadline,
         status,
+        null,
+        null,
         createdAt || new Date().toISOString(),
         updatedAt || new Date().toISOString(),
         createdBy,
@@ -791,6 +798,12 @@ export function registerAssignmentsRoutes(router: Router, db: Database.Database)
         values.push(normalized.length > 0 ? normalized : null);
       }
 
+      if (typeof updates.executionComment === "string") {
+        const normalized = updates.executionComment.trim();
+        setClauses.push("executionComment = ?");
+        values.push(normalized.length > 0 ? normalized : null);
+      }
+
       if (Array.isArray(updates.ccUserIds)) {
         const ccUserIds = parseCcUserIds(updates.ccUserIds);
         const invalidCcUser = ccUserIds.find((userId) => !ensureUserExists(db, userId));
@@ -817,9 +830,27 @@ export function registerAssignmentsRoutes(router: Router, db: Database.Database)
         values.push(updates.status);
       }
 
+      const actorId = typeof updates.updatedBy === "string" && updates.updatedBy.length > 0
+        ? updates.updatedBy
+        : "SYSTEM";
+
       if (typeof updates.updatedBy === "string" && updates.updatedBy.length > 0) {
         setClauses.push("updatedBy = ?");
         values.push(updates.updatedBy);
+      }
+
+      if (typeof updates.status === "string") {
+        if (updates.status === "COMPLETED") {
+          setClauses.push("closedAt = ?");
+          values.push(updates.closedAt ?? new Date().toISOString());
+          setClauses.push("closedBy = ?");
+          values.push(updates.closedBy ?? actorId);
+        } else {
+          setClauses.push("closedAt = ?");
+          values.push(null);
+          setClauses.push("closedBy = ?");
+          values.push(null);
+        }
       }
 
       if (setClauses.length === 0) {
@@ -844,10 +875,6 @@ export function registerAssignmentsRoutes(router: Router, db: Database.Database)
         .get(id) as { correspondenceId: string } | undefined;
 
       if (assignment) {
-        const actorId = typeof updates.updatedBy === "string" && updates.updatedBy.length > 0
-          ? updates.updatedBy
-          : "SYSTEM";
-
         appendAuditEvent(db, assignment.correspondenceId, "CORRESPONDENCE_UPDATED", actorId, {
           actionName: "ASSIGNMENT_UPDATED",
           actionSource: resolveActionSource(actorId),

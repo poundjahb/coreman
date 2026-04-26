@@ -99,6 +99,12 @@ export interface WorkflowExecutionContext {
     users: {
       find: (id: string) => Record<string, unknown> | null;
     };
+    branches: {
+      find: (id: string) => Record<string, unknown> | null;
+    };
+    departments: {
+      find: (id: string) => Record<string, unknown> | null;
+    };
     actionDefinitions: {
       find: (id: string) => Record<string, unknown> | null;
       listActive: () => Array<Record<string, unknown>>;

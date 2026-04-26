@@ -70,7 +70,7 @@ export interface ActionDefinitionEditorState {
   payloadTemplate: string;
   retryMaxAttempts: string;
   retryBackoffMs: string;
-  defaultSlaDays: string;
+  defaultDeadlineDays: string;
   isActive: boolean;
 }
 
@@ -118,7 +118,7 @@ export const emptyActionDefinitionEditorState: ActionDefinitionEditorState = {
   payloadTemplate: "",
   retryMaxAttempts: "0",
   retryBackoffMs: "0",
-  defaultSlaDays: "",
+  defaultDeadlineDays: "",
   isActive: true
 };
 
@@ -183,6 +183,12 @@ export function beginEditUser(user: AppUser): UserEditorState {
 }
 
 export function beginEditActionDefinition(definition: CorrespondenceActionDefinition): ActionDefinitionEditorState {
+  const defaultDeadlineDays = definition.defaultDeadlineDays ?? definition.defaultSlaDays;
+  const defaultDeadlineDaysValue =
+    defaultDeadlineDays === undefined || defaultDeadlineDays === 0
+      ? ""
+      : String(defaultDeadlineDays);
+
   return {
     id: definition.id,
     code: definition.code,
@@ -200,7 +206,7 @@ export function beginEditActionDefinition(definition: CorrespondenceActionDefini
     payloadTemplate: definition.payloadTemplate ?? "",
     retryMaxAttempts: String(definition.retryMaxAttempts),
     retryBackoffMs: String(definition.retryBackoffMs),
-    defaultSlaDays: definition.defaultSlaDays === undefined ? "" : String(definition.defaultSlaDays),
+    defaultDeadlineDays: defaultDeadlineDaysValue,
     isActive: definition.isActive
   };
 }

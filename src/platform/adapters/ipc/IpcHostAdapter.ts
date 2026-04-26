@@ -110,6 +110,10 @@ export function createIpcHostAdapter(): IHostAdapter {
       saveBinding: () => taskAssignmentsNotReady("workflowPlugins.saveBinding"),
       deleteBinding: () => taskAssignmentsNotReady("workflowPlugins.deleteBinding")
     },
+    dateManagement: {
+      getThresholds: () => taskAssignmentsNotReady("dateManagement.getThresholds"),
+      saveThresholds: () => taskAssignmentsNotReady("dateManagement.saveThresholds")
+    },
     sequenceStore: {
       next(_key: string): number {
         throw new Error(

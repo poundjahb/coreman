@@ -17,6 +17,9 @@ export interface CorrespondenceLinkedAction {
   deadline: string;
   status: string;
   description?: string;
+  executionComment?: string;
+  closedAt?: string;
+  closedBy?: string;
 }
 
 export interface CorrespondenceAuditEntry {
@@ -264,7 +267,10 @@ export function CorrespondenceDetailsDrawer(props: CorrespondenceDetailsDrawerPr
                       </Group>
                       <Text size="xs" c="dimmed">Assignee: {action.assignee}</Text>
                       <Text size="xs" c="dimmed">Deadline: {action.deadline || "-"}</Text>
-                      {action.description && <Text size="sm">{action.description}</Text>}
+                      {action.description && <Text size="sm">Description: {action.description}</Text>}
+                      {action.executionComment && <Text size="sm">Execution comment: {action.executionComment}</Text>}
+                      {action.closedBy && <Text size="xs" c="dimmed">Closed by: {action.closedBy}</Text>}
+                      {action.closedAt && <Text size="xs" c="dimmed">Closed at: {action.closedAt}</Text>}
                     </Stack>
                   ))
                 ) : (

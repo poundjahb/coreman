@@ -40,9 +40,19 @@ export class InMemoryCorrespondenceTaskAssignmentRepository implements ICorrespo
     }
 
     const current = this.store[index];
+    const nextStatus = changes.status ?? current.status;
+    const nextClosedAt = nextStatus === "COMPLETED"
+      ? (changes.closedAt ?? current.closedAt ?? new Date())
+      : changes.closedAt;
+    const nextClosedBy = nextStatus === "COMPLETED"
+      ? (changes.closedBy ?? current.closedBy ?? changes.updatedBy ?? current.updatedBy)
+      : changes.closedBy;
+
     this.store[index] = {
       ...current,
       ...changes,
+      closedAt: nextStatus === "COMPLETED" ? nextClosedAt : undefined,
+      closedBy: nextStatus === "COMPLETED" ? nextClosedBy : undefined,
       updatedAt: changes.updatedAt ?? new Date()
     };
   }

@@ -8,6 +8,7 @@ import {
   Drawer,
   Group,
   Menu,
+  Modal,
   SimpleGrid,
   Stack,
   Table,
@@ -17,6 +18,7 @@ import {
 import { KpiCard } from "../components/KpiCard";
 import type { AppUser } from "../../domain/governance";
 import type { Correspondence } from "../../domain/correspondence";
+import type { CorrespondenceTaskAssignment } from "../../domain/correspondenceAction";
 import { hasRole } from "../../application/services/accessControl";
 import { runtimeHostAdapter } from "../../platform/runtimeHostAdapter";
 import { CorrespondenceDetailsDrawerContainer } from "../components/CorrespondenceDetailsDrawerContainer";
@@ -35,13 +37,24 @@ function formatDate(value: Date | undefined): string {
   return value.toISOString().slice(0, 10);
 }
 
+function isOverdue(item: Correspondence, todayIsoDate: string): boolean {
+  if (!item.dueDate || item.status === "CLOSED") {
+    return false;
+  }
+
+  return item.dueDate.toISOString().slice(0, 10) < todayIsoDate;
+}
+
 export function WorkDashboardPage({ currentUser }: WorkDashboardPageProps): JSX.Element {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [assignDrawerOpened, setAssignDrawerOpened] = useState(false);
   const [assignCorrespondenceId, setAssignCorrespondenceId] = useState<string | null>(null);
   const [takeActionDrawerOpened, setTakeActionDrawerOpened] = useState(false);
   const [takeActionCorrespondenceId, setTakeActionCorrespondenceId] = useState<string | null>(null);
+  const [takeActionConfirmOpened, setTakeActionConfirmOpened] = useState(false);
+  const [pendingTakeActionCorrespondenceId, setPendingTakeActionCorrespondenceId] = useState<string | null>(null);
   const [records, setRecords] = useState<Correspondence[]>([]);
+  const [assignedTasks, setAssignedTasks] = useState<CorrespondenceTaskAssignment[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -72,6 +85,7 @@ export function WorkDashboardPage({ currentUser }: WorkDashboardPageProps): JSX.
         }
 
         setRecords(assignedToCurrentUser);
+        setAssignedTasks(taskAssignments);
 
       } catch (loadError) {
         if (!active) {
@@ -94,31 +108,47 @@ export function WorkDashboardPage({ currentUser }: WorkDashboardPageProps): JSX.
     () => records.filter((item) => !["CLOSED", "AUTO_CLOSED", "CANCELLED"].includes(item.status)),
     [records]
   );
+  const todayIsoDate = new Date().toISOString().slice(0, 10);
 
   const stats = useMemo(() => {
-    const completed = activeRecords.filter((item) => item.status === "CLOSED").length;
-    const completion = activeRecords.length === 0 ? 0 : Math.round((completed / activeRecords.length) * 100);
-    const nowIsoDate = new Date().toISOString().slice(0, 10);
-    const overdue = activeRecords.filter((item) => {
-      if (!item.dueDate || item.status === "CLOSED") {
-        return false;
-      }
-
-      return item.dueDate.toISOString().slice(0, 10) < nowIsoDate;
-    }).length;
+    const completedTasks = assignedTasks.filter((task) => task.status === "COMPLETED").length;
+    const totalAssignedTasks = assignedTasks.length;
+    const completion = totalAssignedTasks === 0 ? 0 : Math.round((completedTasks / totalAssignedTasks) * 100);
+    const overdue = activeRecords.filter((item) => isOverdue(item, todayIsoDate)).length;
     const escalated = 0;
     const pending = activeRecords.filter((item) => item.status !== "CLOSED").length;
 
     return {
+      completedTasks,
+      totalAssignedTasks,
       completion,
       overdue,
       escalated,
       pending
     };
-  }, [activeRecords]);
+  }, [activeRecords, assignedTasks, todayIsoDate]);
 
   const isRecipient = hasRole(currentUser, "RECIPIENT") || hasRole(currentUser, "ADMIN");
   const selectedCorrespondence = activeRecords.find((item) => item.id === selectedId) ?? null;
+  const assignedTaskCorrespondenceIds = useMemo(
+    () => new Set(assignedTasks.map((task) => task.correspondenceId)),
+    [assignedTasks]
+  );
+
+  function openTakeAction(correspondenceId: string): void {
+    setTakeActionCorrespondenceId(correspondenceId);
+    setTakeActionDrawerOpened(true);
+  }
+
+  function handleTakeActionRequest(correspondenceId: string): void {
+    if (assignedTaskCorrespondenceIds.has(correspondenceId)) {
+      openTakeAction(correspondenceId);
+      return;
+    }
+
+    setPendingTakeActionCorrespondenceId(correspondenceId);
+    setTakeActionConfirmOpened(true);
+  }
 
   const handleAssignmentCreated = async (): Promise<void> => {
     // Refresh the correspondence list after task assignment
@@ -136,6 +166,7 @@ export function WorkDashboardPage({ currentUser }: WorkDashboardPageProps): JSX.
           || taskCorrespondenceIds.has(item.id)
       );
       setRecords(assignedToCurrentUser);
+      setAssignedTasks(taskAssignments);
     } catch (refreshError) {
       // Non-fatal — assignment succeeded but refresh failed
       console.error("Failed to refresh correspondence list after assignment:", refreshError);
@@ -151,7 +182,11 @@ export function WorkDashboardPage({ currentUser }: WorkDashboardPageProps): JSX.
         </div>
 
         <SimpleGrid cols={{ base: 1, sm: 2, lg: 4 }}>
-          <KpiCard label="Task Completion" value={`${stats.completion}%`} trend="Across assigned tasks" />
+          <KpiCard
+            label="Task Completion"
+            value={`${stats.completion}%`}
+            trend={`${stats.completedTasks} done/${stats.totalAssignedTasks} assigned`} 
+          />
           <KpiCard label="Pending Actions" value={`${stats.pending}`} trend="Require follow-up" />
           <KpiCard label="Overdue" value={`${stats.overdue}`} trend="Immediate attention" />
           <KpiCard label="Escalated" value={`${stats.escalated}`} trend="Blocked or critical" />
@@ -164,39 +199,44 @@ export function WorkDashboardPage({ currentUser }: WorkDashboardPageProps): JSX.
           </Group>
           {error && <Text c="red" size="sm" mb="sm">{error}</Text>}
           <Table.ScrollContainer minWidth={980}>
-            <Table striped highlightOnHover verticalSpacing="xs">
+            <Table striped highlightOnHover verticalSpacing="xs" fz="xs">
               <Table.Thead>
                 <Table.Tr>
+                  <Table.Th>Date</Table.Th>
                   <Table.Th>Reference</Table.Th>
                   <Table.Th>Organisation</Table.Th>
                   <Table.Th>Subject</Table.Th>
-                  <Table.Th>Date</Table.Th>
+                  <Table.Th>Due Date</Table.Th>
                   <Table.Th>Status</Table.Th>
                   <Table.Th>Action</Table.Th>
                 </Table.Tr>
               </Table.Thead>
               <Table.Tbody>
                 {activeRecords.map((row) => (
-                  <Table.Tr key={row.id}>
+                  <Table.Tr
+                    key={row.id}
+                    style={isOverdue(row, todayIsoDate) ? { backgroundColor: "var(--mantine-color-red-0)" } : undefined}
+                  >
+                    <Table.Td><Text size="sm">{formatDate(row.createdAt)}</Text></Table.Td>
                     <Table.Td>
                       <Anchor
                         component="button"
                         type="button"
                         onClick={() => setSelectedId(row.id)}
                         aria-label={`Open details for ${row.senderReference?.trim() || row.reference?.trim() || "-"}`}
-                        size="sm"
+                        size="xs"
                       >
                         {row.senderReference?.trim() || "-"}
                       </Anchor>
                     </Table.Td>
-                    <Table.Td><Text size="sm">{row.organisation ?? "-"}</Text></Table.Td>
-                    <Table.Td><Text size="sm">{row.subject}</Text></Table.Td>
-                    <Table.Td><Text size="sm">{formatDate(row.correspondenceDate)}</Text></Table.Td>
-                    <Table.Td><Text size="sm">{row.status}</Text></Table.Td>
+                    <Table.Td><Text size="xs">{row.organisation ?? "-"}</Text></Table.Td>
+                    <Table.Td><Text size="xs">{row.subject}</Text></Table.Td>
+                    <Table.Td><Text size="xs">{formatDate(row.dueDate)}</Text></Table.Td>
+                    <Table.Td><Text size="xs">{row.status}</Text></Table.Td>
                     <Table.Td>
                       <Menu shadow="md" width={220}>
                         <Menu.Target>
-                          <Button variant="light" size="xs">Open Actions</Button>
+                          <Button variant="light" size="xs">...</Button>
                         </Menu.Target>
                         <Menu.Dropdown>
                           {isRecipient && (
@@ -209,8 +249,7 @@ export function WorkDashboardPage({ currentUser }: WorkDashboardPageProps): JSX.
                           )}
                           {isRecipient && (
                             <Menu.Item onClick={() => {
-                              setTakeActionCorrespondenceId(row.id);
-                              setTakeActionDrawerOpened(true);
+                              handleTakeActionRequest(row.id);
                             }}>
                               Take Action
                             </Menu.Item>
@@ -267,6 +306,44 @@ export function WorkDashboardPage({ currentUser }: WorkDashboardPageProps): JSX.
             onActionUpdated={handleAssignmentCreated}
           />
         </Drawer>
+
+        <Modal
+          opened={takeActionConfirmOpened}
+          onClose={() => {
+            setTakeActionConfirmOpened(false);
+            setPendingTakeActionCorrespondenceId(null);
+          }}
+          title="No assigned task found"
+          centered
+        >
+          <Stack gap="md">
+            <Text size="sm">
+              No task is currently assigned to you for this correspondence. Do you want to continue to the Take Action page anyway?
+            </Text>
+            <Group justify="flex-end">
+              <Button
+                variant="default"
+                onClick={() => {
+                  setTakeActionConfirmOpened(false);
+                  setPendingTakeActionCorrespondenceId(null);
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={() => {
+                  if (pendingTakeActionCorrespondenceId) {
+                    openTakeAction(pendingTakeActionCorrespondenceId);
+                  }
+                  setTakeActionConfirmOpened(false);
+                  setPendingTakeActionCorrespondenceId(null);
+                }}
+              >
+                Continue
+              </Button>
+            </Group>
+          </Stack>
+        </Modal>
 
         <Card withBorder radius="md" p="md">
           <Group justify="space-between" mb="sm">

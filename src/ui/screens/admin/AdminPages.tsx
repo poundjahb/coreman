@@ -8,6 +8,7 @@ export { AdminActionsCatalogPage } from "./AdminActionsCatalogPage";
 export { AdminSmtpSettingsPage } from "./AdminSmtpSettingsPage"; // Legacy export
 export { AdminEmailSettingsPage } from "./AdminEmailSettingsPage";
 export { AdminFlowAgentsPage } from "./AdminFlowAgentsPage";
+export { AdminDateManagementPage } from "./AdminDateManagementPage";
 export { AdminAuditLogsPage } from "./AdminAuditLogsPage";
 export { AdminHealthPage } from "./AdminHealthPage";
 export { AdminPerformancePage } from "./AdminPerformancePage";
@@ -17,6 +18,7 @@ import { AdminBranchesPage } from "./AdminBranchesPage";
 import { AdminDepartmentsPage } from "./AdminDepartmentsPage";
 import { AdminActionsCatalogPage } from "./AdminActionsCatalogPage";
 import { AdminEmailSettingsPage } from "./AdminEmailSettingsPage";
+import { AdminDateManagementPage } from "./AdminDateManagementPage";
 
 /**
  * Tab wrapper for Reference Data (Branches + Departments)
@@ -65,6 +67,7 @@ export function AdminSystemControlTabPage(): JSX.Element {
           <Tabs.List>
             <Tabs.Tab value="email">Email Settings</Tabs.Tab>
             <Tabs.Tab value="actions">Actions</Tabs.Tab>
+            <Tabs.Tab value="date-management">Date Management</Tabs.Tab>
           </Tabs.List>
 
           <Tabs.Panel value="email" pt="md">
@@ -73,6 +76,10 @@ export function AdminSystemControlTabPage(): JSX.Element {
 
           <Tabs.Panel value="actions" pt="md">
             <AdminActionsCatalogPage embedded />
+          </Tabs.Panel>
+
+          <Tabs.Panel value="date-management" pt="md">
+            <AdminDateManagementPage embedded />
           </Tabs.Panel>
         </Tabs>
       </Stack>

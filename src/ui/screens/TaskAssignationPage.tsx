@@ -33,6 +33,14 @@ function createId(): string {
   return `asg-${Date.now()}-${Math.floor(Math.random() * 100000)}`;
 }
 
+function formatDefaultDeadline(daysFromToday: number): string {
+  const safeDays = Number.isFinite(daysFromToday) ? Math.max(0, Math.trunc(daysFromToday)) : 0;
+  const dueDate = new Date();
+  dueDate.setUTCHours(0, 0, 0, 0);
+  dueDate.setUTCDate(dueDate.getUTCDate() + safeDays);
+  return dueDate.toISOString().slice(0, 10);
+}
+
 export function TaskAssignationPage(props: TaskAssignationPageProps): JSX.Element {
   const { correspondenceId, currentUser, onAssignmentCreated } = props;
   const [selectedCorrespondenceId, setSelectedCorrespondenceId] = useState<string | null>(correspondenceId ?? null);
@@ -100,6 +108,29 @@ export function TaskAssignationPage(props: TaskAssignationPageProps): JSX.Elemen
     [users]
   );
   const effectiveCurrentUser = currentUser ?? fallbackCurrentUser;
+  const selectedCorrespondence = useMemo(
+    () => correspondences.find((item) => item.id === selectedCorrespondenceId) ?? null,
+    [correspondences, selectedCorrespondenceId]
+  );
+  const selectedActionDefinition = useMemo(
+    () => actionDefinitions.find((definition) => definition.id === actionDefinitionId) ?? null,
+    [actionDefinitionId, actionDefinitions]
+  );
+
+  useEffect(() => {
+    if (!selectedActionDefinition) {
+      return;
+    }
+
+    const defaultDeadlineDays =
+      selectedActionDefinition.defaultDeadlineDays ?? selectedActionDefinition.defaultSlaDays;
+
+    if (defaultDeadlineDays === undefined) {
+      return;
+    }
+
+    setDeadline(formatDefaultDeadline(defaultDeadlineDays));
+  }, [selectedActionDefinition]);
 
   async function submitAssignation(): Promise<void> {
     if (!selectedCorrespondenceId) {
@@ -158,7 +189,10 @@ export function TaskAssignationPage(props: TaskAssignationPageProps): JSX.Elemen
       <Stack gap="lg">
         <div>
           <Title order={2}>Task Assignation</Title>
-          <Text c="dimmed" size="sm">Select an action type, assignee, optional CC users, and a deadline.</Text>
+          <Text c="dimmed" size="sm">
+            Select an action type, assignee, optional CC users, and a deadline. Deadline defaults from the action
+            definition when configured.
+          </Text>
         </div>
 
         {loading && (
@@ -187,7 +221,9 @@ export function TaskAssignationPage(props: TaskAssignationPageProps): JSX.Elemen
             )}
 
             {correspondenceId && (
-              <Text size="sm" c="dimmed">Correspondence ID: {correspondenceId}</Text>
+              <Text size="sm" c="dimmed">
+                Correspondence: {selectedCorrespondence?.subject ?? "Loading correspondence..."}
+              </Text>
             )}
 
             <Group grow>

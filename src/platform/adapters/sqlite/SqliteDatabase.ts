@@ -167,16 +167,47 @@ function initSchema(db: Database): void {
       payloadTemplate    TEXT,
       retryMaxAttempts   INTEGER NOT NULL,
       retryBackoffMs     INTEGER NOT NULL,
+      defaultDeadlineDays INTEGER,
       defaultSlaDays     INTEGER,
       isActive           INTEGER NOT NULL,
       createdAt          TEXT NOT NULL,
       updatedAt          TEXT NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS date_management_settings (
+      id                              INTEGER PRIMARY KEY CHECK (id = 1),
+      assignmentReminderDays          INTEGER NOT NULL,
+      assignmentEscalationDays        INTEGER NOT NULL,
+      assignmentAutoCloseDays         INTEGER NOT NULL,
+      recipientInactionReminderDays   INTEGER NOT NULL,
+      recipientInactionEscalationDays INTEGER NOT NULL,
+      recipientInactionAutoCloseDays  INTEGER NOT NULL,
+      updatedAt                       TEXT NOT NULL
+    );
   `);
 
   ensureCorrespondenceColumns(db);
   ensureUserColumns(db);
+  ensureCorrespondenceActionDefinitionColumns(db);
   ensureCorrespondenceUserReferenceTriggers(db);
+}
+
+function ensureCorrespondenceActionDefinitionColumns(db: Database): void {
+  const columns = db
+    .prepare("PRAGMA table_info(correspondence_action_definitions)")
+    .all() as Array<{ name: string }>;
+  const existing = new Set(columns.map((column) => column.name));
+
+  if (!existing.has("defaultDeadlineDays")) {
+    db.exec("ALTER TABLE correspondence_action_definitions ADD COLUMN defaultDeadlineDays INTEGER");
+  }
+
+  db.exec(`
+    UPDATE correspondence_action_definitions
+    SET defaultDeadlineDays = defaultSlaDays
+    WHERE defaultDeadlineDays IS NULL
+      AND defaultSlaDays IS NOT NULL
+  `);
 }
 
 function ensureUserColumns(db: Database): void {
@@ -417,6 +448,18 @@ function seedDatabase(db: Database): void {
       pass: smtpConfig.pass ?? null,
       fromAddress: smtpConfig.fromAddress,
       connectionTimeoutMs: smtpConfig.connectionTimeoutMs,
+      updatedAt: new Date().toISOString()
+    });
+  }
+
+  if (!hasRows(db, "date_management_settings")) {
+    db.prepare(
+      `INSERT INTO date_management_settings
+        (id, assignmentReminderDays, assignmentEscalationDays, assignmentAutoCloseDays,
+         recipientInactionReminderDays, recipientInactionEscalationDays, recipientInactionAutoCloseDays, updatedAt)
+       VALUES
+        (1, 2, 5, 10, 2, 5, 10, @updatedAt)`
+    ).run({
       updatedAt: new Date().toISOString()
     });
   }

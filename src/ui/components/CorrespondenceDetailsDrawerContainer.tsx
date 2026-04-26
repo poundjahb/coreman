@@ -174,7 +174,10 @@ export function CorrespondenceDetailsDrawerContainer(props: CorrespondenceDetail
     assignee: usersById.get(assignment.assigneeUserId)?.fullName ?? assignment.assigneeUserId,
     deadline: formatDate(assignment.deadline),
     status: assignment.status,
-    description: assignment.description
+    description: assignment.description,
+    executionComment: assignment.executionComment,
+    closedAt: formatDate(assignment.closedAt),
+    closedBy: assignment.closedBy ? (usersById.get(assignment.closedBy)?.fullName ?? assignment.closedBy) : undefined
   }));
 
   const auditRows = auditEntries.map((entry) => ({

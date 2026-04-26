@@ -233,10 +233,10 @@ export function CorrespondenceSearchPage(props: { currentUser: AppUser }): JSX.E
                     <Table.Td>
                       <Menu shadow="md" width={220}>
                         <Menu.Target>
-                          <Button variant="light" size="xs">Open Actions</Button>
+                          <Button variant="light" size="xs">...</Button>
                         </Menu.Target>
                         <Menu.Dropdown>
-                          {isRecipient && (
+                          {isRecipient && row.status !== "CLOSED" && row.status !== "CANCELLED" && (
                             <Menu.Item onClick={() => {
                               setAssignCorrespondenceId(row.id);
                               setAssignDrawerOpened(true);
@@ -244,13 +244,16 @@ export function CorrespondenceSearchPage(props: { currentUser: AppUser }): JSX.E
                               Assign Task
                             </Menu.Item>
                           )}
-                          {isRecipient && (
+                          {isRecipient && row.status !== "CLOSED" && row.status !== "CANCELLED" && (
                             <Menu.Item onClick={() => {
                               setTakeActionCorrespondenceId(row.id);
                               setTakeActionDrawerOpened(true);
                             }}>
                               Take Action
                             </Menu.Item>
+                          )}
+                          {isRecipient && (row.status === "CLOSED" || row.status === "CANCELLED") && (
+                            <Menu.Item disabled>No actions available for closed or cancelled correspondence</Menu.Item>
                           )}
                           {!isRecipient && <Menu.Item disabled>No available action for your role</Menu.Item>}
                         </Menu.Dropdown>

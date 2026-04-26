@@ -126,6 +126,12 @@ export async function executeWorkflowTrigger(
         users: {
           find: (id: string) => getRow(db, "SELECT * FROM users WHERE id = ?", id)
         },
+        branches: {
+          find: (id: string) => getRow(db, "SELECT * FROM branches WHERE id = ?", id)
+        },
+        departments: {
+          find: (id: string) => getRow(db, "SELECT * FROM departments WHERE id = ?", id)
+        },
         actionDefinitions: {
           find: (id: string) => getRow(db, "SELECT * FROM action_definitions WHERE id = ?", id),
           listActive: () =>

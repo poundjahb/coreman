@@ -29,6 +29,7 @@ export interface CorrespondenceActionDefinition {
   payloadTemplate?: string;
   retryMaxAttempts: number;
   retryBackoffMs: number;
+  defaultDeadlineDays?: number;
   defaultSlaDays?: number;
   isActive: boolean;
   createdAt: Date;
@@ -40,10 +41,13 @@ export interface CorrespondenceTaskAssignment {
   correspondenceId: string;
   actionDefinitionId: string;
   description?: string;
+  executionComment?: string;
   assigneeUserId: string;
   ccUserIds: string[];
   deadline: Date;
   status: CorrespondenceTaskAssignmentStatus;
+  closedAt?: Date;
+  closedBy?: string;
   createdAt: Date;
   updatedAt: Date;
   createdBy: string;

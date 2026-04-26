@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Alert,
   Button,
@@ -14,7 +14,7 @@ import {
   Title
 } from "@mantine/core";
 import type { AppUser } from "../../domain/governance";
-import type { CorrespondenceTaskAssignment } from "../../domain/correspondenceAction";
+import type { CorrespondenceActionDefinition, CorrespondenceTaskAssignment } from "../../domain/correspondenceAction";
 import { hasRole } from "../../application/services/accessControl";
 import { runtimeHostAdapter } from "../../platform/runtimeHostAdapter";
 
@@ -30,9 +30,11 @@ export function TakeActionPage(props: TakeActionPageProps = {}): JSX.Element {
   const { correspondenceId, currentUser, onActionUpdated } = props;
   const [selectedAssignmentId, setSelectedAssignmentId] = useState<string | null>(null);
   const [assignments, setAssignments] = useState<CorrespondenceTaskAssignment[]>([]);
+  const [actionDefinitions, setActionDefinitions] = useState<CorrespondenceActionDefinition[]>([]);
   const [status, setStatus] = useState<string | null>(null);
   const [deadline, setDeadline] = useState(() => new Date().toISOString().slice(0, 10));
-  const [comment, setComment] = useState("");
+  const [description, setDescription] = useState("");
+  const [executionComment, setExecutionComment] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -56,6 +58,7 @@ export function TakeActionPage(props: TakeActionPageProps = {}): JSX.Element {
         }
 
         const loaded = await runtimeHostAdapter.taskAssignments.findByCorrespondence(correspondenceId);
+        const loadedActionDefinitions = await runtimeHostAdapter.actionDefinitions.findAll();
 
         if (!active) {
           return;
@@ -68,6 +71,7 @@ export function TakeActionPage(props: TakeActionPageProps = {}): JSX.Element {
         }
 
         setAssignments(filtered);
+  setActionDefinitions(loadedActionDefinitions);
 
         // Auto-select first assignment if available
         if (filtered.length > 0) {
@@ -75,7 +79,8 @@ export function TakeActionPage(props: TakeActionPageProps = {}): JSX.Element {
           setSelectedAssignmentId(firstAssignment.id);
           setStatus(firstAssignment.status);
           setDeadline(firstAssignment.deadline instanceof Date ? firstAssignment.deadline.toISOString().slice(0, 10) : new Date(firstAssignment.deadline).toISOString().slice(0, 10));
-          setComment(firstAssignment.description ?? "");
+          setDescription(firstAssignment.description ?? "");
+          setExecutionComment(firstAssignment.executionComment ?? "");
         } else {
           setError("No task assignments found for this correspondence");
         }
@@ -99,6 +104,16 @@ export function TakeActionPage(props: TakeActionPageProps = {}): JSX.Element {
     };
   }, [correspondenceId, currentUser]);
 
+  const selectedAssignment = useMemo(
+    () => assignments.find((assignment) => assignment.id === selectedAssignmentId) ?? null,
+    [assignments, selectedAssignmentId]
+  );
+  const selectedActionDefinition = useMemo(
+    () => actionDefinitions.find((definition) => definition.id === selectedAssignment?.actionDefinitionId) ?? null,
+    [actionDefinitions, selectedAssignment]
+  );
+  const actionTypeDescription = selectedActionDefinition?.description || "";
+
   // Handle assignment selection change
   function handleAssignmentChange(assignmentId: string | null): void {
     if (!assignmentId) {
@@ -110,7 +125,8 @@ export function TakeActionPage(props: TakeActionPageProps = {}): JSX.Element {
       setSelectedAssignmentId(assignmentId);
       setStatus(selected.status);
       setDeadline(selected.deadline instanceof Date ? selected.deadline.toISOString().slice(0, 10) : new Date(selected.deadline).toISOString().slice(0, 10));
-      setComment(selected.description ?? "");
+      setDescription(selected.description ?? "");
+      setExecutionComment(selected.executionComment ?? "");
     }
   }
 
@@ -135,12 +151,18 @@ export function TakeActionPage(props: TakeActionPageProps = {}): JSX.Element {
         return;
       }
 
+      const now = new Date();
+      const actorId = currentUser?.id ?? "SYSTEM";
+      const isCompleted = status === "COMPLETED";
+
       // Call update API
       await runtimeHostAdapter.taskAssignments.update(selectedAssignmentId, {
         status: status as "ASSIGNED" | "IN_PROGRESS" | "COMPLETED" | "CANCELED",
         deadline: new Date(deadline),
-        description: comment.trim().length > 0 ? comment : undefined,
-        updatedBy: currentUser?.id ?? "SYSTEM"
+        executionComment: executionComment.trim().length > 0 ? executionComment.trim() : undefined,
+        closedAt: isCompleted ? now : undefined,
+        closedBy: isCompleted ? actorId : undefined,
+        updatedBy: actorId
       });
 
       setMessage("Action updated successfully");
@@ -216,11 +238,27 @@ export function TakeActionPage(props: TakeActionPageProps = {}): JSX.Element {
             />
 
             <Textarea
-              label="Action comment"
+              label="Action type description"
+              minRows={4}
+              value={actionTypeDescription}
+              placeholder="No action guidance defined for this task type."
+              readOnly
+            />
+
+            <Textarea
+              label="Action comment (description)"
+              minRows={3}
+              value={description}
+              placeholder="No action comment defined for this assignment."
+              readOnly
+            />
+
+            <Textarea
+              label="Execution comment"
               minRows={4}
               placeholder="Describe what was done, blockers, and next step"
-              value={comment}
-              onChange={(event) => setComment(event.currentTarget.value)}
+              value={executionComment}
+              onChange={(event) => setExecutionComment(event.currentTarget.value)}
             />
 
             <FileInput
